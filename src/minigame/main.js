@@ -18,6 +18,15 @@ const TOP = (win.safeArea && win.safeArea.top) || 0;
 /* ================= 渲染器 ================= */
 
 const canvas = wx.createCanvas(); // 首次调用 => 屏幕主画布
+// iOS/Android 真机的 canvas 是原生桥接对象，没有 addEventListener/removeEventListener，
+// 而 three 构造 WebGLRenderer 时会无条件注册 webglcontextlost 等事件（开发者工具的
+// canvas 是 JS 实现有这些方法，真机上 undefined）。补空实现避免启动即崩。
+try {
+  if (typeof canvas.addEventListener !== 'function') {
+    canvas.addEventListener = () => {};
+    canvas.removeEventListener = () => {};
+  }
+} catch (e) { /* 极老机型原生对象不可扩展时仅降级，无事件也不影响渲染 */ }
 // 强制 WebGL1：微信开发者工具(Windows) 的 WebGL2 模拟存在 GLSL 翻译缺陷，
 // MeshStandardMaterial 片元着色器会编译失败；WebGL1 是小游戏最稳路径，
 // 实例化渲染经 ANGLE_instanced_arrays 扩展（覆盖率接近 100%）。

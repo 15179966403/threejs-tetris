@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { COLS, ROWS, CELL, COLORS, CLEAR_TIME, FX_COLORS } from '../constants.js';
+import { FxMarkerPool } from '../fxMarker.js';
 
 /** 格子坐标 -> 世界坐标（棋盘中心为原点，行 0 在顶部） */
 function cellToWorld(row, col) {
@@ -70,6 +71,12 @@ export class BoardView {
       scene.add(line);
       this.ghost.push(line);
     }
+
+    // 特殊格激光方向箭头（锁定后 / 下落中都能一眼看出位置与朝向）
+    this.fx = new FxMarkerPool(scene);
+    this.activeFx = new THREE.Mesh(this.fx.geometry, this.fx.materials.up);
+    this.activeFx.visible = false;
+    scene.add(this.activeFx);
 
     this._buildArena();
   }
@@ -155,6 +162,7 @@ export class BoardView {
     if (key !== this._boardKey || isClearing || this._wasClearing) {
       this._boardKey = key;
       this._wasClearing = isClearing;
+      this.fx.begin();
       const phase = Math.min(1, game.clearTimer / CLEAR_TIME);
       let i = 0;
       for (let r = 0; r < ROWS; r++) {
@@ -174,14 +182,17 @@ export class BoardView {
           if (clearing.has(r)) this._c.lerp(this._white, phase);
           else if (cell.fx) this._c.lerp(this._fxc.setHex(FX_COLORS[cell.fx]), 0.5);
           this.settled.setColorAt(i, this._c);
+          if (cell.fx) this.fx.place(x, y, cell.fx);
         }
       }
+      this.fx.end();
       this.settled.instanceMatrix.needsUpdate = true;
       if (this.settled.instanceColor) this.settled.instanceColor.needsUpdate = true;
     }
 
     // 2. 活动方块 + 落点投影
     let ai = 0;
+    this.activeFx.visible = false;
     if (game.current && game.state === 'playing') {
       const { matrix, x, y, type, special } = game.current;
       const color = COLORS[type];
@@ -192,12 +203,19 @@ export class BoardView {
           const cell = this.active[ai];
           cell.visible = true;
           const isSpecial = special && special.r === r && special.c === c;
-          const tint = isSpecial ? FX_COLORS[special.fx] : color;
-          cell.material.color.setHex(tint);
-          cell.material.emissive.setHex(tint);
+          // 活动格保持本色，仅自发光向效果色偏移；箭头标记实时跟随
+          cell.material.color.setHex(color);
+          cell.material.emissive.setHex(isSpecial ? FX_COLORS[special.fx] : color);
           cell.material.emissiveIntensity = isSpecial ? 0.55 : 0.18;
           const [wx, wy] = cellToWorld(y + r, x + c);
           cell.position.set(wx, wy, 0);
+
+          if (isSpecial) {
+            this.activeFx.position.set(wx, wy, 0.5);
+            this.activeFx.rotation.z = special.fx === 'down' ? Math.PI : 0;
+            this.activeFx.material = this.fx.materials[special.fx];
+            this.activeFx.visible = true;
+          }
 
           const g = this.ghost[ai];
           if (gy > y) {
@@ -216,5 +234,7 @@ export class BoardView {
       this.active[i].visible = false;
       this.ghost[i].visible = false;
     }
+
+    this.fx.pulse(performance.now() / 1000);
   }
 }

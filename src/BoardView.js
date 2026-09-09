@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { COLS, ROWS, CELL, COLORS, CLEAR_TIME, FX_COLORS } from './constants.js';
+import { FxMarkerPool } from './fxMarker.js';
 
 /** 格子坐标 -> 世界坐标（棋盘中心为原点，行 0 在顶部） */
 function cellToWorld(row, col) {
@@ -55,6 +56,12 @@ export class BoardView {
       scene.add(line);
       this.ghost.push(line);
     }
+
+    // 特殊格激光方向箭头（锁定后 / 下落中都能一眼看出位置与朝向）
+    this.fx = new FxMarkerPool(scene);
+    this.activeFx = new THREE.Mesh(this.fx.geometry, this.fx.materials.up);
+    this.activeFx.visible = false;
+    scene.add(this.activeFx);
 
     this.#buildArena();
   }
@@ -131,6 +138,7 @@ export class BoardView {
   sync(game) {
     // 1. 已锁定方块
     const clearing = new Set(game.clearingRows);
+    this.fx.begin();
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         const mesh = this.settled[r][c];
@@ -152,6 +160,8 @@ export class BoardView {
           mesh.material.emissive.setHex(FX_COLORS[cell.fx]);
           mesh.material.emissiveIntensity = 0.45;
           mesh.scale.setScalar(1);
+          const [fx, fy] = cellToWorld(r, c);
+          this.fx.place(fx, fy, cell.fx);
         } else {
           mesh.material.emissiveIntensity = 0;
           mesh.scale.setScalar(1);
@@ -161,6 +171,7 @@ export class BoardView {
 
     // 2. 活动方块 + 落点投影
     let ai = 0;
+    this.activeFx.visible = false;
     if (game.current && game.state === 'playing') {
       const { matrix, x, y, type, special } = game.current;
       const color = COLORS[type];
@@ -183,6 +194,14 @@ export class BoardView {
           const [wx, wy] = cellToWorld(y + r, x + c);
           cell.position.set(wx, wy, 0);
 
+          // 下落中的特殊格：箭头标记实时跟随
+          if (special && special.r === r && special.c === c) {
+            this.activeFx.position.set(wx, wy, 0.5);
+            this.activeFx.rotation.z = special.fx === 'down' ? Math.PI : 0;
+            this.activeFx.material = this.fx.materials[special.fx];
+            this.activeFx.visible = true;
+          }
+
           const g = this.ghost[ai];
           if (gy > y) {
             const [gx, gwy] = cellToWorld(gy + r, x + c);
@@ -200,5 +219,8 @@ export class BoardView {
       this.active[i].visible = false;
       this.ghost[i].visible = false;
     }
+
+    this.fx.end();
+    this.fx.pulse(performance.now() / 1000);
   }
 }

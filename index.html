@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D Tetris · Three.js</title>
+    <style>
+      :root {
+        --panel: rgba(13, 18, 38, 0.72);
+        --border: rgba(120, 140, 255, 0.25);
+        --accent: #22d3ee;
+        --text: #e2e8f0;
+        --muted: #7d8bb0;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        height: 100%;
+        overflow: hidden;
+        background: #0b0f1a;
+        color: var(--text);
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        user-select: none;
+      }
+      #app, #app canvas { position: fixed; inset: 0; }
+
+      /* ---------- HUD ---------- */
+      #hud {
+        position: fixed;
+        top: 16px; left: 16px; right: 16px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        pointer-events: none;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 18px;
+        backdrop-filter: blur(8px);
+      }
+      .stats { display: flex; gap: 26px; }
+      .stat { display: flex; flex-direction: column; gap: 2px; }
+      .label { font-size: 11px; letter-spacing: 0.22em; color: var(--muted); }
+      .value {
+        font-size: 22px;
+        font-weight: 700;
+        color: var(--accent);
+        font-variant-numeric: tabular-nums;
+        text-shadow: 0 0 12px rgba(34, 211, 238, 0.4);
+      }
+      #next-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 16px);
+        grid-auto-rows: 16px;
+        gap: 3px;
+        margin-top: 8px;
+      }
+      #next-grid div { border-radius: 4px; transition: background 0.15s; }
+
+      /* ---------- 浮层 ---------- */
+      #overlay {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(5, 8, 18, 0.55);
+        backdrop-filter: blur(4px);
+      }
+      #overlay.hidden { display: none; }
+      .dialog { text-align: center; padding: 36px 52px; max-width: 440px; }
+      .dialog h1 {
+        font-size: 36px;
+        letter-spacing: 0.14em;
+        margin-bottom: 14px;
+        color: var(--accent);
+        text-shadow: 0 0 28px rgba(34, 211, 238, 0.55);
+      }
+      .dialog p { color: #9fb0d8; line-height: 1.9; margin-bottom: 24px; font-size: 14px; }
+      .dialog b { color: var(--accent); font-size: 18px; }
+      .dialog button {
+        pointer-events: auto;
+        cursor: pointer;
+        border: none;
+        border-radius: 10px;
+        padding: 13px 40px;
+        font-size: 16px;
+        font-weight: 600;
+        color: #04101a;
+        background: linear-gradient(135deg, #22d3ee, #4f8dff);
+        box-shadow: 0 0 26px rgba(34, 211, 238, 0.35);
+        transition: transform 0.12s, box-shadow 0.12s;
+      }
+      .dialog button:hover { transform: translateY(-2px); box-shadow: 0 0 36px rgba(34, 211, 238, 0.55); }
+
+      /* ---------- 底部按键提示 ---------- */
+      #controls {
+        position: fixed;
+        bottom: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 12px;
+        color: #66739a;
+        letter-spacing: 0.08em;
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <div id="hud">
+      <div class="panel stats">
+        <div class="stat"><span class="label">SCORE</span><span class="value" id="score">0</span></div>
+        <div class="stat"><span class="label">LINES</span><span class="value" id="lines">0</span></div>
+        <div class="stat"><span class="label">LEVEL</span><span class="value" id="level">1</span></div>
+      </div>
+      <div class="panel">
+        <div class="label">NEXT</div>
+        <div id="next-grid"></div>
+      </div>
+    </div>
+
+    <div id="overlay">
+      <div class="panel dialog">
+        <h1 id="overlay-title">3D TETRIS</h1>
+        <p id="overlay-text"></p>
+        <button id="overlay-btn">开始游戏</button>
+      </div>
+    </div>
+
+    <div id="controls">← → 移动　·　↑ / X 旋转　·　Z 反转　·　↓ 软降　·　空格 硬降　·　P 暂停　·　R 重开</div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

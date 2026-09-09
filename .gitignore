@@ -1,0 +1,10 @@
+node_modules
+dist
+.DS_Store
+.debug
+
+# 构建产物（克隆后执行 npm run minigame 生成）
+minigame/game.js
+
+# 微信开发者工具的本地个人配置
+minigame/project.private.config.json

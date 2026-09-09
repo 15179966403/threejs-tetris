@@ -1,0 +1,19 @@
+{
+  "name": "threejs-tetris",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "minigame": "vite build --config vite.minigame.config.js",
+    "minigame:watch": "vite build --config vite.minigame.config.js --watch"
+  },
+  "dependencies": {
+    "three": "^0.162.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

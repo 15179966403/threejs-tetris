@@ -1,6 +1,6 @@
 // 临时逻辑冒烟测试：node tests/smoke.mjs
 import { TetrisGame } from '../src/TetrisGame.js';
-import { COLS, ROWS } from '../src/constants.js';
+import { COLS, ROWS, SHAPES } from '../src/constants.js';
 
 let failures = 0;
 const check = (name, cond) => {
@@ -46,7 +46,7 @@ const check = (name, cond) => {
 {
   const g = new TetrisGame();
   g.start();
-  for (let c = 0; c < COLS - 1; c++) g.board[ROWS - 1][c] = 'O';
+  for (let c = 0; c < COLS - 1; c++) g.board[ROWS - 1][c] = { t: 'O', fx: null };
   let sawClearing = false;
   for (let i = 0; i < 80 && !sawClearing; i++) {
     if (g.state === 'gameover' || !g.current) break;
@@ -69,14 +69,14 @@ const check = (name, cond) => {
 {
   const g = new TetrisGame();
   g.start();
-  for (let c = 0; c < COLS; c++) g.board[ROWS - 1][c] = 'I';
-  g.board[ROWS - 2][3] = 'T';
+  for (let c = 0; c < COLS; c++) g.board[ROWS - 1][c] = { t: 'I', fx: null };
+  g.board[ROWS - 2][3] = { t: 'T', fx: null };
   g.clearingRows = [ROWS - 1];
   g.state = 'clearing';
   g.clearTimer = 1; // >= CLEAR_TIME
   g.update(0.016);
   check('消行后行数守恒', g.board.length === ROWS);
-  check('上方块下移一行', g.board[ROWS - 1][3] === 'T');
+  check('上方块下移一行', g.board[ROWS - 1][3] && g.board[ROWS - 1][3].t === 'T');
   check('被消行不存在残留', g.board[ROWS - 2][3] === null && g.board[ROWS - 2].every((v) => v === null));
   check('消行后回到 playing 并生成新方块', g.state === 'playing' && g.current !== null);
 }
@@ -96,8 +96,8 @@ const check = (name, cond) => {
     }
     if (!g.current) break;
     // 维持底行：除最右列外全部填满
-    for (let c = 0; c < COLS - 1; c++) if (!g.board[ROWS - 1][c]) g.board[ROWS - 1][c] = 'O';
-    const snapshot = g.board.map((r) => r.join('|'));
+    for (let c = 0; c < COLS - 1; c++) if (!g.board[ROWS - 1][c]) g.board[ROWS - 1][c] = { t: 'O', fx: null };
+    const snapshot = g.board.map((r) => r.map((v) => (v ? { ...v } : null)));
     if (g.current.type === 'I') {
       g.rotate(1); // 转竖补最右列
       for (let k = 0; k < 6; k++) g.move(1, 0);
@@ -107,7 +107,7 @@ const check = (name, cond) => {
       g.hardDrop();
       // 不触发消行的干扰方块直接回滚，避免左侧堆死
       if (g.state === 'playing') {
-        g.board = snapshot.map((r) => r.split('|').map((v) => (v === 'null' ? null : v)));
+        g.board = snapshot.map((r) => r.map((v) => (v ? { ...v } : null)));
       }
     }
   }
@@ -149,6 +149,80 @@ const check = (name, cond) => {
   check('暂停时方块不下落', g.current.y === y);
   g.togglePause();
   check('恢复 playing', g.state === 'playing');
+}
+
+// 9. 特殊格生成
+{
+  const g = new TetrisGame();
+  g.start();
+  const s = g.current.special;
+  check('当前方块携带特殊格', !!s && (s.fx === 'up' || s.fx === 'down'));
+  check('特殊格位于有效格上', !!SHAPES[g.current.type][s.r][s.c]);
+  check('next 预览携带特殊格', !!g.nextSpecial && !!SHAPES[g.nextType][g.nextSpecial.r][g.nextSpecial.c]);
+  check('锁定后特殊格写入棋盘', (() => {
+    const { x, special } = g.current;
+    const gy = g.ghostY();
+    g.hardDrop();
+    const cell = g.board[gy + special.r][x + special.c];
+    return !!cell && cell.fx === special.fx;
+  })());
+}
+
+// 10. 特殊格坐标随旋转变换（顺时针 (r,c) -> (c, n-1-r)）
+{
+  const g = new TetrisGame();
+  g.start();
+  g.current.type = 'T';
+  g.current.matrix = [[1, 0, 0], [1, 1, 1], [0, 0, 0]];
+  g.current.x = 3;
+  g.current.y = 2;
+  g.current.special = { r: 1, c: 0, fx: 'up' };
+  g.rotate(1);
+  check(
+    '旋转后特殊格坐标变换',
+    g.current.special.r === 0 && g.current.special.c === 1 && g.current.special.fx === 'up'
+  );
+  check('变换后的特殊格仍在有效格上', g.current.matrix[g.current.special.r][g.current.special.c] === 1);
+}
+
+// 11. 消行触发 up 激光：清除同列上方全部方块
+{
+  const g = new TetrisGame();
+  g.start();
+  for (let c = 0; c < COLS; c++) g.board[ROWS - 1][c] = { t: 'O', fx: null };
+  g.board[ROWS - 1][5] = { t: 'O', fx: 'up' };
+  g.board[10][5] = { t: 'I', fx: null };
+  g.board[4][5] = { t: 'I', fx: null };
+  g.board[18][0] = { t: 'Z', fx: null }; // 干扰：不在同列
+  g.clearingRows = [ROWS - 1];
+  g.clearTimer = 1;
+  g.state = 'clearing';
+  g.update(1);
+  check('up 激光清除同列上方全部方块', g.board[10][5] === null && g.board[4][5] === null);
+  check('消行后其他列方块下移一行', g.board[19][0] && g.board[19][0].t === 'Z');
+  check('激光得分入账（2格×10×1级）', g.score === 20);
+  check('激光后正常生成新方块', g.state === 'playing' && g.current !== null);
+}
+
+// 12. down 激光 + 被激光清除的特殊格连锁触发
+{
+  const g = new TetrisGame();
+  g.start();
+  for (let c = 0; c < COLS; c++) g.board[15][c] = { t: 'O', fx: null };
+  g.board[15][2] = { t: 'O', fx: 'down' };
+  g.board[16][2] = { t: 'J', fx: null };
+  g.board[18][2] = { t: 'L', fx: 'up' }; // 被第一个激光清掉 → 连锁
+  g.board[10][2] = { t: 'I', fx: null }; // 连锁 up 激光应清除它
+  g.board[14][7] = { t: 'Z', fx: null }; // 无关列
+  g.clearingRows = [15];
+  g.clearTimer = 1;
+  g.state = 'clearing';
+  g.update(1);
+  check('down 激光清除同列下方', g.board[16][2] === null && g.board[18][2] === null);
+  check('连锁触发 up 激光', g.board[10][2] === null);
+  check('消行后无关列方块下移一行', g.board[15][7] && g.board[15][7].t === 'Z');
+  check('连锁得分入账（3格×10×1级）', g.score === 30);
+  check('连锁后状态合法', g.state === 'playing' && g.current !== null);
 }
 
 console.log(failures === 0 ? '\n全部通过 ✔' : `\n${failures} 项失败 ✘`);

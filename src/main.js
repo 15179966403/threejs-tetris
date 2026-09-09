@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { TetrisGame } from './TetrisGame.js';
 import { BoardView } from './BoardView.js';
-import { COLS, ROWS, SHAPES, COLORS } from './constants.js';
+import { COLS, ROWS, SHAPES, COLORS, FX_COLORS } from './constants.js';
 
 /* ================= 渲染器与场景 ================= */
 
@@ -81,11 +81,15 @@ const nextGrid = document.getElementById('next-grid');
 for (let i = 0; i < 16; i++) nextGrid.appendChild(document.createElement('div'));
 
 let lastNext = null;
-function updateNextPreview(type) {
-  if (type === lastNext) return;
-  lastNext = type;
+function updateNextPreview(type, special) {
+  const sig = type + (special ? `:${special.r},${special.c},${special.fx}` : '');
+  if (sig === lastNext) return;
+  lastNext = sig;
   const divs = nextGrid.children;
-  for (const d of divs) d.style.background = 'transparent';
+  for (const d of divs) {
+    d.style.background = 'transparent';
+    d.style.boxShadow = 'none';
+  }
   const shape = SHAPES[type];
   let minR = 4, maxR = -1, minC = 4, maxC = -1;
   shape.forEach((row, r) =>
@@ -105,6 +109,12 @@ function updateNextPreview(type) {
       divs[idx].style.background = hex;
     })
   );
+  // 特殊格：按效果色描边
+  if (special) {
+    const idx = (special.r - minR + offY) * 4 + (special.c - minC + offX);
+    const fxHex = '#' + FX_COLORS[special.fx].toString(16).padStart(6, '0');
+    divs[idx].style.boxShadow = `inset 0 0 0 2px ${fxHex}`;
+  }
 }
 
 /* ================= 浮层（开始 / 暂停 / 结束） ================= */
@@ -123,7 +133,8 @@ function refreshOverlay() {
   overlay.classList.remove('hidden');
   if (s === 'ready') {
     ovTitle.textContent = '3D TETRIS';
-    ovText.innerHTML = '← → 移动 · ↑ 旋转 · ↓ 软降<br>空格 硬降 · P 暂停 · R 重新开始';
+    ovText.innerHTML =
+      '← → 移动 · ↑ 旋转 · ↓ 软降<br>空格 硬降 · P 暂停 · R 重新开始<br>发光格随消行发射激光：↑清上方 · ↓清下方';
     ovBtn.textContent = '开始游戏';
   } else if (s === 'paused') {
     ovTitle.textContent = 'PAUSED';
@@ -192,7 +203,7 @@ function tick() {
   const dt = Math.min(clock.getDelta(), 0.05); // 防止切后台后 dt 过大
   game.update(dt);
   view.sync(game);
-  updateNextPreview(game.nextType);
+  updateNextPreview(game.nextType, game.nextSpecial);
 
   scoreEl.textContent = game.score;
   linesEl.textContent = game.lines;

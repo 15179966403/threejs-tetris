@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { SHAPES, COLORS } from '../constants.js';
+import { SHAPES, COLORS, FX_COLORS } from '../constants.js';
 
 /* ---------- 与 Web 版 CSS 一致的配色 ---------- */
 const PANEL = 'rgba(13, 18, 38, 0.72)';
@@ -249,6 +249,28 @@ export class GameUI {
         c.fill();
       })
     );
+    // 特殊格：效果色描边 + 激光方向箭头
+    const sp = game.nextSpecial;
+    if (sp) {
+      const sx = gx + (sp.c - minC + offX) * (cell + gap);
+      const sy = gy + (sp.r - minR + offY) * (cell + gap);
+      const fxHex = '#' + FX_COLORS[sp.fx].toString(16).padStart(6, '0');
+      this._rr(c, sx - 1.5, sy - 1.5, cell + 3, cell + 3, 4);
+      c.strokeStyle = fxHex;
+      c.lineWidth = 1.5;
+      c.stroke();
+      const mx = sx + cell / 2;
+      const my = sy + cell / 2;
+      c.fillStyle = fxHex;
+      c.beginPath();
+      if (sp.fx === 'up') {
+        c.moveTo(mx, my - 4); c.lineTo(mx + 3.5, my + 3); c.lineTo(mx - 3.5, my + 3);
+      } else {
+        c.moveTo(mx, my + 4); c.lineTo(mx + 3.5, my - 3); c.lineTo(mx - 3.5, my - 3);
+      }
+      c.closePath();
+      c.fill();
+    }
     c.textAlign = 'left';
   }
 
@@ -379,7 +401,7 @@ export class GameUI {
 
     const pw = Math.min(W - 48, 340);
     const state = game.state;
-    const ph = state === 'gameover' ? 252 : state === 'ready' ? 238 : 216;
+    const ph = state === 'gameover' ? 252 : state === 'ready' ? 260 : 216;
     const px = (W - pw) / 2;
     const py = (H - ph) / 2 - 30;
     this._panel(c, px, py, pw, ph);
@@ -397,9 +419,10 @@ export class GameUI {
     c.font = `12px ${FONT}`;
     c.fillStyle = '#9fb0d8';
     if (state === 'ready') {
-      c.fillText('十字键 ←→ 移动 · ↑ 旋转', W / 2, py + 100);
-      c.fillText('↓ 加速 · 连按两下↓ 直接落地', W / 2, py + 122);
-      c.fillText('「选择」键切换左右手布局', W / 2, py + 144);
+      c.fillText('十字键 ←→ 移动 · ↑ 旋转', W / 2, py + 96);
+      c.fillText('↓ 加速 · 连按两下↓ 直接落地', W / 2, py + 118);
+      c.fillText('发光格随消行放激光：↑清上 ↓清下', W / 2, py + 140);
+      c.fillText('「选择」键切换左右手布局', W / 2, py + 162);
     } else if (state === 'paused') {
       c.fillText('点击任意处继续', W / 2, py + 116);
     } else {

@@ -1,4 +1,14 @@
-import { COLS, ROWS, SHAPES, TYPES, LINE_SCORES, CLEAR_TIME } from './constants.js';
+import {
+  COLS,
+  ROWS,
+  SHAPES,
+  TYPES,
+  LINE_SCORES,
+  CLEAR_TIME,
+  SPECIAL_CHANCE,
+  FX_TYPES,
+  LASER_CELL_SCORE,
+} from './constants.js';
 
 /** 矩阵顺时针旋转 90° */
 function rotateCW(m) {
@@ -29,11 +39,12 @@ export class TetrisGame {
   }
 
   reset() {
-    /** board[row][col]：null 为空，否则为方块类型字母 */
+    /** board[row][col]：null 为空，否则为 { t: 方块类型字母, fx: null | 'up' | 'down' } */
     this.board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
     this.bag = [];
+    this.nextSpecial = null; // next 方块上的特殊格 { r, c, fx }（矩阵坐标）
     this.nextType = this.#draw();
-    this.current = null; // { type, matrix, x, y }
+    this.current = null; // { type, matrix, x, y, special }
     this.score = 0;
     this.lines = 0;
     this.level = 1;
@@ -48,7 +59,7 @@ export class TetrisGame {
     return Math.max(0.05, 0.9 * Math.pow(0.82, this.level - 1));
   }
 
-  /** 7-bag 随机器：每 7 个方块一组洗牌，保证分布均匀 */
+  /** 7-bag 随机器：每 7 个方块一组洗牌，保证分布均匀；同时随机生成特殊格 */
   #draw() {
     if (!this.bag.length) {
       this.bag = [...TYPES];
@@ -57,7 +68,20 @@ export class TetrisGame {
         [this.bag[i], this.bag[j]] = [this.bag[j], this.bag[i]];
       }
     }
-    return this.bag.pop();
+    const type = this.bag.pop();
+    // 特殊格：在方块的有效格中随机选一个，效果随机「上/下激光」
+    this.nextSpecial = null;
+    if (Math.random() < SPECIAL_CHANCE) {
+      const cells = [];
+      SHAPES[type].forEach((row, r) => row.forEach((v, c) => v && cells.push({ r, c })));
+      const pick = cells[(Math.random() * cells.length) | 0];
+      this.nextSpecial = {
+        r: pick.r,
+        c: pick.c,
+        fx: FX_TYPES[(Math.random() * FX_TYPES.length) | 0],
+      };
+    }
+    return type;
   }
 
   start() {
@@ -74,6 +98,7 @@ export class TetrisGame {
   /** 生成新方块；与已有方块重叠则游戏结束 */
   #spawn() {
     const type = this.nextType;
+    const special = this.nextSpecial;
     this.nextType = this.#draw();
     const matrix = SHAPES[type].map((r) => [...r]);
     this.current = {
@@ -81,6 +106,7 @@ export class TetrisGame {
       matrix,
       x: ((COLS - matrix.length) / 2) | 0,
       y: -1, // 从可见区顶部之上出现
+      special,
     };
     this.dropTimer = 0;
     if (this.#collides(matrix, this.current.x, this.current.y)) {
@@ -132,6 +158,7 @@ export class TetrisGame {
       if (!this.#collides(rotated, cur.x + dx, cur.y)) {
         cur.matrix = rotated;
         cur.x += dx;
+        if (cur.special) cur.special = this.#rotateSpecial(cur.special, rotated.length, dir);
         return true;
       }
     }
@@ -141,10 +168,18 @@ export class TetrisGame {
         cur.matrix = rotated;
         cur.x += dx;
         cur.y -= 1;
+        if (cur.special) cur.special = this.#rotateSpecial(cur.special, rotated.length, dir);
         return true;
       }
     }
     return false;
+  }
+
+  /** 特殊格坐标随矩阵旋转变换（与 rotateCW/CCW 同步推导） */
+  #rotateSpecial(s, n, dir) {
+    return dir > 0
+      ? { r: s.c, c: n - 1 - s.r, fx: s.fx } // 顺时针 (r,c) -> (c, n-1-r)
+      : { r: n - 1 - s.c, c: s.r, fx: s.fx }; // 逆时针 (r,c) -> (n-1-c, r)
   }
 
   /** 当前方块硬降后所在行 */
@@ -181,7 +216,7 @@ export class TetrisGame {
 
   /** 将当前方块写入棋盘，检测消行 */
   #lock() {
-    const { matrix, x, y, type } = this.current;
+    const { matrix, x, y, type, special } = this.current;
     let overflow = false;
     for (let r = 0; r < matrix.length; r++) {
       for (let c = 0; c < matrix[r].length; c++) {
@@ -192,7 +227,8 @@ export class TetrisGame {
           overflow = true; // 锁定在可见区之外 => 顶死
           continue;
         }
-        this.board[by][bx] = type;
+        const isSpecial = special && special.r === r && special.c === c;
+        this.board[by][bx] = { t: type, fx: isSpecial ? special.fx : null };
       }
     }
     this.current = null;
@@ -219,12 +255,48 @@ export class TetrisGame {
     }
   }
 
-  /** 消行动画结束，真正移除行并生成新方块 */
+  /** 消行动画结束，移除行并触发特殊格激光（可连锁），然后生成新方块 */
   #finishClear() {
+    // 1. 收集被消除行中的特殊格，换算成消行下移后的列位作为激光起点
+    const triggers = [];
+    for (const r of this.clearingRows) {
+      for (let c = 0; c < COLS; c++) {
+        const cell = this.board[r][c];
+        if (cell && cell.fx) {
+          const below = this.clearingRows.filter((rr) => rr > r).length;
+          triggers.push({ x: c, y: r + below, fx: cell.fx });
+        }
+      }
+    }
+
+    // 2. 常规消行 + 上方下移
     this.board = this.board.filter((_, r) => !this.clearingRows.includes(r));
     while (this.board.length < ROWS) this.board.unshift(Array(COLS).fill(null));
     this.clearingRows = [];
     this.state = 'playing';
+
+    // 3. 依次发射激光（被激光清除的特殊格会连锁入队）
+    let cellsCleared = 0;
+    const queue = triggers;
+    while (queue.length) {
+      const { x, y, fx } = queue.shift();
+      if (fx === 'up') {
+        for (let yy = y - 1; yy >= 0; yy--) cellsCleared += this.#zap(x, yy, queue);
+      } else {
+        for (let yy = y + 1; yy < ROWS; yy++) cellsCleared += this.#zap(x, yy, queue);
+      }
+    }
+    if (cellsCleared) this.score += cellsCleared * LASER_CELL_SCORE * this.level;
+
     this.#spawn();
+  }
+
+  /** 清除单个格子；若其为特殊格则连锁入队，返回是否清除 */
+  #zap(x, y, queue) {
+    const cell = this.board[y][x];
+    if (!cell) return 0;
+    this.board[y][x] = null;
+    if (cell.fx) queue.push({ x, y, fx: cell.fx });
+    return 1;
   }
 }

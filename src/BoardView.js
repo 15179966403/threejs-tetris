@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { COLS, ROWS, CELL, COLORS, CLEAR_TIME } from './constants.js';
+import { COLS, ROWS, CELL, COLORS, CLEAR_TIME, FX_COLORS } from './constants.js';
 
 /** 格子坐标 -> 世界坐标（棋盘中心为原点，行 0 在顶部） */
 function cellToWorld(row, col) {
@@ -134,19 +134,24 @@ export class BoardView {
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         const mesh = this.settled[r][c];
-        const type = game.board[r][c];
-        if (!type) {
+        const cell = game.board[r][c];
+        if (!cell) {
           mesh.visible = false;
           continue;
         }
         mesh.visible = true;
-        mesh.material.color.setHex(COLORS[type]);
+        mesh.material.color.setHex(COLORS[cell.t]);
         if (clearing.has(r)) {
           // 消行动画：闪白 + 收缩
           const phase = Math.min(1, game.clearTimer / CLEAR_TIME);
           mesh.material.emissive.setHex(0xffffff);
           mesh.material.emissiveIntensity = 1.6 * phase;
           mesh.scale.setScalar(1 - 0.6 * phase);
+        } else if (cell.fx) {
+          // 特殊格：按激光方向常亮发光提示（↑青 / ↓橙）
+          mesh.material.emissive.setHex(FX_COLORS[cell.fx]);
+          mesh.material.emissiveIntensity = 0.45;
+          mesh.scale.setScalar(1);
         } else {
           mesh.material.emissiveIntensity = 0;
           mesh.scale.setScalar(1);
@@ -157,7 +162,7 @@ export class BoardView {
     // 2. 活动方块 + 落点投影
     let ai = 0;
     if (game.current && game.state === 'playing') {
-      const { matrix, x, y, type } = game.current;
+      const { matrix, x, y, type, special } = game.current;
       const color = COLORS[type];
       const gy = game.ghostY();
       for (let r = 0; r < matrix.length; r++) {
@@ -165,9 +170,16 @@ export class BoardView {
           if (!matrix[r][c]) continue;
           const cell = this.active[ai];
           cell.visible = true;
+          const isSpecial = special && special.r === r && special.c === c;
           cell.material.color.setHex(color);
-          cell.material.emissive.setHex(color);
-          cell.material.emissiveIntensity = 0.18;
+          if (isSpecial) {
+            // 活动方块上的特殊格：按效果色高亮，提示玩家调整旋转/落点
+            cell.material.emissive.setHex(FX_COLORS[special.fx]);
+            cell.material.emissiveIntensity = 0.55;
+          } else {
+            cell.material.emissive.setHex(color);
+            cell.material.emissiveIntensity = 0.18;
+          }
           const [wx, wy] = cellToWorld(y + r, x + c);
           cell.position.set(wx, wy, 0);
 

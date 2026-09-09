@@ -61,3 +61,15 @@ export const TYPES = Object.keys(SHAPES);
 
 /** 4 行消行的基础得分，乘以当前等级 */
 export const LINE_SCORES = [0, 100, 300, 500, 800];
+
+/** 特殊方格出现概率（1 = 每个方块必带一个，可下调调难度） */
+export const SPECIAL_CHANCE = 1;
+
+/** 特殊方格的激光效果：up = 消除同列上方 / down = 消除同列下方 */
+export const FX_TYPES = ['up', 'down'];
+
+/** 激光效果提示色（视图用）：↑青色 / ↓橙色 */
+export const FX_COLORS = { up: 0x22d3ee, down: 0xf97316 };
+
+/** 激光每清除一个方格的得分（× 当前等级） */
+export const LASER_CELL_SCORE = 10;

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { COLS, ROWS, CELL, COLORS, CLEAR_TIME } from '../constants.js';
+import { COLS, ROWS, CELL, COLORS, CLEAR_TIME, FX_COLORS } from '../constants.js';
 
 /** 格子坐标 -> 世界坐标（棋盘中心为原点，行 0 在顶部） */
 function cellToWorld(row, col) {
@@ -29,6 +29,7 @@ export class BoardView {
     this._m = new THREE.Matrix4();
     this._c = new THREE.Color();
     this._white = new THREE.Color(1, 1, 1);
+    this._fxc = new THREE.Color(); // 特殊格效果色暂存（与 _c 分开，避免 lerp 覆盖）
     // 脏标记：棋盘内容指纹 + 消行状态
     this._boardKey = '';
     this._wasClearing = false;
@@ -148,7 +149,9 @@ export class BoardView {
 
     // 1. 已锁定方块：仅棋盘变化或消行动画期间重写实例数据
     let key = '';
-    for (let r = 0; r < ROWS; r++) key += game.board[r].join(',') + '|';
+    for (let r = 0; r < ROWS; r++) {
+      key += game.board[r].map((v) => (v ? v.t + (v.fx || '') : '')).join(',') + '|';
+    }
     if (key !== this._boardKey || isClearing || this._wasClearing) {
       this._boardKey = key;
       this._wasClearing = isClearing;
@@ -156,8 +159,8 @@ export class BoardView {
       let i = 0;
       for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++, i++) {
-          const type = game.board[r][c];
-          if (!type) {
+          const cell = game.board[r][c];
+          if (!cell) {
             this.settled.setMatrixAt(i, ZERO_MATRIX);
             continue;
           }
@@ -166,9 +169,10 @@ export class BoardView {
           this._m.makeScale(s, s, s);
           this._m.setPosition(x, y, 0);
           this.settled.setMatrixAt(i, this._m);
-          // 消行时颜色向白色过渡（替代 Web 版的自发光闪烁，实例化下零额外开销）
-          this._c.setHex(COLORS[type]);
+          // 特殊格向效果色偏亮提示（↑青 / ↓橙）；消行时颜色向白色过渡
+          this._c.setHex(COLORS[cell.t]);
           if (clearing.has(r)) this._c.lerp(this._white, phase);
+          else if (cell.fx) this._c.lerp(this._fxc.setHex(FX_COLORS[cell.fx]), 0.5);
           this.settled.setColorAt(i, this._c);
         }
       }
@@ -179,7 +183,7 @@ export class BoardView {
     // 2. 活动方块 + 落点投影
     let ai = 0;
     if (game.current && game.state === 'playing') {
-      const { matrix, x, y, type } = game.current;
+      const { matrix, x, y, type, special } = game.current;
       const color = COLORS[type];
       const gy = game.ghostY();
       for (let r = 0; r < matrix.length; r++) {
@@ -187,9 +191,11 @@ export class BoardView {
           if (!matrix[r][c]) continue;
           const cell = this.active[ai];
           cell.visible = true;
-          cell.material.color.setHex(color);
-          cell.material.emissive.setHex(color);
-          cell.material.emissiveIntensity = 0.18;
+          const isSpecial = special && special.r === r && special.c === c;
+          const tint = isSpecial ? FX_COLORS[special.fx] : color;
+          cell.material.color.setHex(tint);
+          cell.material.emissive.setHex(tint);
+          cell.material.emissiveIntensity = isSpecial ? 0.55 : 0.18;
           const [wx, wy] = cellToWorld(y + r, x + c);
           cell.position.set(wx, wy, 0);
 

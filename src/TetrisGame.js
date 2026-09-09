@@ -57,7 +57,12 @@ function rotateCCW(m) {
  * 状态机：ready -> playing <-> paused -> clearing -> playing ... -> gameover
  */
 export class TetrisGame {
-  constructor() {
+  /**
+   * @param options.specialChance 特殊格出现概率覆盖（默认取 SPECIAL_CHANCE；
+   *        测试/教学模式可传 0 关闭）
+   */
+  constructor(options = {}) {
+    this.specialChance = options.specialChance ?? SPECIAL_CHANCE;
     this.reset();
   }
 
@@ -94,9 +99,9 @@ export class TetrisGame {
       }
     }
     const type = this.bag.pop();
-    // 特殊格：在方块的有效格中随机选一个，效果随机「上/下激光」
+    // 特殊格：在方块的有效格中随机选一个，效果随机「8 向」之一
     this.nextSpecial = null;
-    if (Math.random() < SPECIAL_CHANCE) {
+    if (Math.random() < this.specialChance) {
       const cells = [];
       SHAPES[type].forEach((row, r) => row.forEach((v, c) => v && cells.push({ r, c })));
       const pick = cells[(Math.random() * cells.length) | 0];

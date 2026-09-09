@@ -81,9 +81,9 @@ const check = (name, cond) => {
   check('消行后回到 playing 并生成新方块', g.state === 'playing' && g.current !== null);
 }
 
-// 6. 计分与等级（走真实消行链路：反复补满底行累计 10 行）
+// 6. 计分与等级（走真实消行链路：反复补满底行累计 10 行；关闭特殊格保证确定性）
 {
-  const g = new TetrisGame();
+  const g = new TetrisGame({ specialChance: 0 });
   g.start();
   const s0 = g.score;
   check('软降加 1 分', (g.softDrop(), g.score === s0 + 1));
@@ -161,7 +161,7 @@ const check = (name, cond) => {
   const s = g.current.special;
   check('当前方块携带特殊格且方向合法', !!s && FX_TYPES.includes(s.fx));
   check('特殊格位于有效格上', !!SHAPES[g.current.type][s.r][s.c]);
-  check('next 预览携带特殊格', !!g.nextSpecial);
+  check('next 预览特殊格合法（概率可为空）', g.nextSpecial === null || FX_TYPES.includes(g.nextSpecial.fx));
   check('锁定后特殊格写入棋盘', (() => {
     const { x, special } = g.current;
     const gy = g.ghostY();

@@ -53,6 +53,7 @@ const game = new TetrisGame();
 
 /* ================= 相机取景（自适应窗口） ================= */
 
+const CAM_BASE = { x: 0, y: 0 };
 function fitCamera() {
   const aspect = window.innerWidth / window.innerHeight;
   camera.aspect = aspect;
@@ -62,6 +63,8 @@ function fitCamera() {
   // 保证棋盘（含余量）完整入画
   const dist = Math.max(halfH / Math.tan(fov / 2), halfW / (Math.tan(fov / 2) * aspect));
   camera.position.set(0, halfH * 0.28, dist);
+  CAM_BASE.x = camera.position.x;
+  CAM_BASE.y = camera.position.y;
   camera.lookAt(0, 0, 0);
   camera.updateProjectionMatrix();
 }
@@ -222,8 +225,18 @@ function tick() {
   requestAnimationFrame(tick);
   const dt = Math.min(clock.getDelta(), 0.05); // 防止切后台后 dt 过大
   game.update(dt);
-  view.sync(game);
+  view.sync(game, dt);
   updateNextPreview(game.nextType, game.nextSpecial);
+
+  // 震屏：特效强度驱动的相机抖动，线性衰减
+  view.shake = Math.max(0, view.shake - dt * 1.2);
+  if (view.shake > 0.001) {
+    camera.position.x = CAM_BASE.x + (Math.random() - 0.5) * view.shake;
+    camera.position.y = CAM_BASE.y + (Math.random() - 0.5) * view.shake;
+  } else {
+    camera.position.x = CAM_BASE.x;
+    camera.position.y = CAM_BASE.y;
+  }
 
   scoreEl.textContent = game.score;
   linesEl.textContent = game.lines;

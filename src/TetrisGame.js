@@ -76,6 +76,7 @@ export class TetrisGame {
     this.dropTimer = 0;
     this.clearTimer = 0;
     this.clearingRows = [];
+    this.fxEvents = []; // 视图特效事件队列（视图每帧消费后清空）
   }
 
   /** 每级下落间隔（秒），随等级加快 */
@@ -273,6 +274,7 @@ export class TetrisGame {
       this.clearingRows = full;
       this.clearTimer = 0;
       this.state = 'clearing';
+      this.fxEvents.push({ type: 'clear', rows: full.slice() });
       this.score += LINE_SCORES[full.length] * this.level;
       this.lines += full.length;
       this.level = Math.floor(this.lines / 10) + 1;
@@ -310,13 +312,15 @@ export class TetrisGame {
     while (queue.length) {
       const { x, y, fx } = queue.shift();
       const [dx, dy] = FX_DIRS[fx];
+      const touched = [];
       let xx = x + dx;
       let yy = y + dy;
       while (xx >= 0 && xx < COLS && yy >= 0 && yy < ROWS) {
-        cellsCleared += this.#applyFx(xx, yy, dx, dy, queue);
+        cellsCleared += this.#applyFx(xx, yy, dx, dy, queue, touched);
         xx += dx;
         yy += dy;
       }
+      this.fxEvents.push({ type: 'beam', x, y, dx, dy, fx, cells: touched });
     }
     if (cellsCleared) this.score += cellsCleared * LASER_CELL_SCORE * this.level;
 
@@ -328,6 +332,7 @@ export class TetrisGame {
       this.clearingRows = full;
       this.clearTimer = 0;
       this.state = 'clearing'; // 留在 clearing：下一波动画结束后再次进入本方法
+      this.fxEvents.push({ type: 'clear', rows: full.slice() });
       this.score += LINE_SCORES[full.length] * this.level * (this.combo + 1);
       this.lines += full.length;
       this.level = Math.floor(this.lines / 10) + 1;
@@ -340,7 +345,7 @@ export class TetrisGame {
   }
 
   /** 对单个格子施加方向效果：正交=清除，斜向=取反；返回清除的格子数 */
-  #applyFx(x, y, dx, dy, queue) {
+  #applyFx(x, y, dx, dy, queue, touched) {
     const diagonal = dx !== 0 && dy !== 0;
     const cell = this.board[y][x];
     if (diagonal) {
@@ -348,14 +353,17 @@ export class TetrisGame {
       if (cell) {
         this.board[y][x] = null;
         if (cell.fx) queue.push({ x, y, fx: cell.fx });
+        touched.push([x, y, 0]);
         return 1;
       }
       this.board[y][x] = { t: 'X', fx: null };
+      touched.push([x, y, 1]);
       return 0;
     }
     if (!cell) return 0;
     this.board[y][x] = null;
     if (cell.fx) queue.push({ x, y, fx: cell.fx });
+    touched.push([x, y, 0]);
     return 1;
   }
 }

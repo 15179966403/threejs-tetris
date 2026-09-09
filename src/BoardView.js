@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { COLS, ROWS, CELL, COLORS, CLEAR_TIME, FX_COLORS } from './constants.js';
 import { FxMarkerPool } from './fxMarker.js';
+import { FxParticles, FxBeams } from './fxParticles.js';
 
 /** 格子坐标 -> 世界坐标（棋盘中心为原点，行 0 在顶部） */
 function cellToWorld(row, col) {
@@ -62,6 +63,11 @@ export class BoardView {
     this.activeFx = new THREE.Mesh(this.fx.geometry, this.fx.materials.up);
     this.activeFx.visible = false;
     scene.add(this.activeFx);
+
+    // 粒子 / 光束 / 震屏
+    this.particles = new FxParticles(scene);
+    this.beams = new FxBeams(scene);
+    this.shake = 0;
 
     this.#buildArena();
   }
@@ -135,10 +141,52 @@ export class BoardView {
   }
 
   /** 将游戏状态同步到 3D 场景（每帧调用） */
-  sync(game) {
+  /** 消费游戏逻辑产出的特效事件（粒子 / 光束 / 震屏） */
+  _consumeEvents(game) {
+    const events = game.fxEvents;
+    if (!events || !events.length) return;
+    for (const ev of events) {
+      if (ev.type === 'clear') {
+        // 消行：每个格子按自身颜色炸出碎块
+        for (const r of ev.rows) {
+          for (let c = 0; c < COLS; c++) {
+            const cell = game.board[r][c];
+            if (!cell) continue;
+            const [x, y] = cellToWorld(r, c);
+            this.particles.burst(x, y, COLORS[cell.t], 3, 1);
+          }
+        }
+        this.shake = Math.min(0.3, this.shake + 0.15);
+      } else if (ev.type === 'beam') {
+        // 光束：从触发格贯穿到边界
+        const stepsX =
+          ev.dx > 0 ? COLS - 1 - ev.x : ev.dx < 0 ? ev.x : Infinity;
+        const stepsY =
+          ev.dy > 0 ? ROWS - 1 - ev.y : ev.dy < 0 ? ev.y : Infinity;
+        const k = Math.min(stepsX, stepsY);
+        if (isFinite(k) && k >= 0) {
+          const [x0, y0] = cellToWorld(ev.y, ev.x);
+          const [x1, y1] = cellToWorld(ev.y + ev.dy * k, ev.x + ev.dx * k);
+          this.beams.fire(x0, y0, x1, y1, FX_COLORS[ev.fx]);
+        }
+        const col = FX_COLORS[ev.fx];
+        const [tx, ty] = cellToWorld(ev.y, ev.x);
+        this.particles.burst(tx, ty, col, 6, 1.4); // 触发点爆一下
+        for (const [cx, cy, added] of ev.cells) {
+          const [px, py] = cellToWorld(cy, cx);
+          this.particles.burst(px, py, col, added ? 2 : 3, 0.8);
+        }
+        this.shake = Math.min(0.35, this.shake + 0.12);
+      }
+    }
+    events.length = 0;
+  }
+
+  sync(game, dt) {
     // 1. 已锁定方块
     const clearing = new Set(game.clearingRows);
     this.fx.begin();
+    this._consumeEvents(game);
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         const mesh = this.settled[r][c];
@@ -150,11 +198,15 @@ export class BoardView {
         mesh.visible = true;
         mesh.material.color.setHex(COLORS[cell.t]);
         if (clearing.has(r)) {
-          // 消行动画：闪白 + 收缩
+          // 消行动画：先膨胀再收缩消失，闪白拉满
           const phase = Math.min(1, game.clearTimer / CLEAR_TIME);
           mesh.material.emissive.setHex(0xffffff);
-          mesh.material.emissiveIntensity = 1.6 * phase;
-          mesh.scale.setScalar(1 - 0.6 * phase);
+          mesh.material.emissiveIntensity = 1.2 + 1.4 * phase;
+          const s =
+            phase < 0.3
+              ? 1 + 0.3 * (phase / 0.3)
+              : Math.max(0, 1.3 * (1 - (phase - 0.3) / 0.7));
+          mesh.scale.setScalar(s);
         } else if (cell.fx) {
           // 特殊格：按激光方向常亮发光提示（↑青 / ↓橙）
           mesh.material.emissive.setHex(FX_COLORS[cell.fx]);
@@ -222,5 +274,7 @@ export class BoardView {
 
     this.fx.end();
     this.fx.pulse(performance.now() / 1000);
+    this.particles.update(dt);
+    this.beams.update(dt);
   }
 }

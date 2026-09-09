@@ -7,6 +7,9 @@ export const CELL = 1;
 /** 消行闪光动画时长（秒），逻辑与视图共用 */
 export const CLEAR_TIME = 0.35;
 
+/** 消行及特效执行完毕后，暂停图形下落供玩家观察新布局的停顿时间（秒） */
+export const SETTLE_TIME = 0.5;
+
 /** 7 种方块的经典配色 + 异形块 X（斜向取反生成的紫色填充块） */
 export const COLORS = {
   I: 0x22d3ee, // 青

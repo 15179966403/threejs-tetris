@@ -5,6 +5,7 @@ import {
   TYPES,
   LINE_SCORES,
   CLEAR_TIME,
+  SETTLE_TIME,
   SPECIAL_CHANCE,
   FX_TYPES,
   LASER_CELL_SCORE,
@@ -80,7 +81,9 @@ export class TetrisGame {
     this.combo = 0; // 连锁波次（消行后由特殊格引发的额外消行轮数）
     this.dropTimer = 0;
     this.clearTimer = 0;
+    this.clearPhase = 0; // 0: 消行闪烁动画 (CLEAR_TIME); 1: 消除后棋盘观察期 (SETTLE_TIME)
     this.clearingRows = [];
+    this.decayQueue = []; // 待倒计时销毁的方块队列 [{ x, y, countdown }]
     this.fxEvents = []; // 视图特效事件队列（视图每帧消费后清空）
   }
 
@@ -234,7 +237,25 @@ export class TetrisGame {
   update(dt) {
     if (this.state === 'clearing') {
       this.clearTimer += dt;
-      if (this.clearTimer >= CLEAR_TIME) this.#finishClear();
+      if (this.clearPhase === 0) {
+        // 第 0 阶段：消行行闪烁与缩放动画
+        if (this.clearTimer >= CLEAR_TIME) {
+          const rem = this.clearTimer - CLEAR_TIME;
+          this.#finishClear();
+          // 如果未触发新连击消行，#finishClear 会将 clearPhase 切换为 1（观察停顿期）
+          if (this.clearPhase === 1) {
+            this.clearTimer += rem;
+            if (this.clearTimer >= SETTLE_TIME) {
+              this.#finishSettle();
+            }
+          }
+        }
+      } else if (this.clearPhase === 1) {
+        // 第 1 阶段：消除后停顿观察期，暂停图形下落
+        if (this.clearTimer >= SETTLE_TIME) {
+          this.#finishSettle();
+        }
+      }
       return;
     }
     if (this.state !== 'playing' || !this.current) return;
@@ -268,6 +289,9 @@ export class TetrisGame {
       return;
     }
 
+    // 推进倒计时销毁：在玩家放置图形时，依次消除刚刚生成的满足条件的方块
+    this.#stepDecay();
+
     const full = [];
     for (let r = 0; r < ROWS; r++) {
       if (this.board[r].every((v) => v)) full.push(r);
@@ -277,6 +301,7 @@ export class TetrisGame {
       // 进入消行状态，视图层会播放闪光动画；combo 归零表示连锁波次的起点
       this.combo = 0;
       this.clearingRows = full;
+      this.clearPhase = 0;
       this.clearTimer = 0;
       this.state = 'clearing';
       this.fxEvents.push({ type: 'clear', rows: full.slice() });
@@ -286,6 +311,50 @@ export class TetrisGame {
     } else {
       this.#spawn();
     }
+  }
+
+  /** 放置图形时推进倒计时销毁：依次消除刚刚生成的满足条件的方块 */
+  #stepDecay() {
+    if (!this.decayQueue || !this.decayQueue.length) return;
+
+    // 弹出并销毁队首的 1 个有效方块
+    while (this.decayQueue.length) {
+      const target = this.decayQueue.shift();
+      const cell = this.board[target.y] && this.board[target.y][target.x];
+      if (cell && cell.decay) {
+        this.board[target.y][target.x] = null;
+        this.fxEvents.push({ type: 'decay', x: target.x, y: target.y });
+        break; // 本次放置只消除 1 个
+      }
+    }
+
+    // 重新校准队列中剩余方块的倒计时步数（从 1 开始依序递增）
+    for (let i = 0; i < this.decayQueue.length; i++) {
+      const item = this.decayQueue[i];
+      const cell = this.board[item.y] && this.board[item.y][item.x];
+      if (cell && cell.decay) {
+        cell.decay = i + 1;
+        item.countdown = i + 1;
+      }
+    }
+  }
+
+  /** 消行后校准待销毁队列中方块的坐标 */
+  #updateDecayQueueAfterClear(clearingRows) {
+    if (!this.decayQueue || !this.decayQueue.length) return;
+    const nextQueue = [];
+    for (const item of this.decayQueue) {
+      if (clearingRows.includes(item.y)) {
+        continue; // 该行被消除了
+      }
+      const below = clearingRows.filter((r) => r > item.y).length;
+      item.y += below;
+      const cell = this.board[item.y] && this.board[item.y][item.x];
+      if (cell && cell.decay) {
+        nextQueue.push(item);
+      }
+    }
+    this.decayQueue = nextQueue;
   }
 
   /**
@@ -306,10 +375,10 @@ export class TetrisGame {
     }
 
     // 2. 常规消行 + 上方下移
+    this.#updateDecayQueueAfterClear(this.clearingRows);
     this.board = this.board.filter((_, r) => !this.clearingRows.includes(r));
     while (this.board.length < ROWS) this.board.unshift(Array(COLS).fill(null));
     this.clearingRows = [];
-    this.state = 'playing';
 
     // 3. 依次施加方向效果（正交激光清除 / 斜向取反，被清除的特殊格连锁入队）
     let cellsCleared = 0;
@@ -321,11 +390,39 @@ export class TetrisGame {
       let xx = x + dx;
       let yy = y + dy;
       while (xx >= 0 && xx < COLS && yy >= 0 && yy < ROWS) {
-        cellsCleared += this.#applyFx(xx, yy, dx, dy, queue, touched);
+        cellsCleared += this.#applyFx(xx, yy, dx, dy, queue, touched, fx);
         xx += dx;
         yy += dy;
       }
       this.fxEvents.push({ type: 'beam', x, y, dx, dy, fx, cells: touched });
+
+      // 东北 (ne) / 西北 (nw) 斜向箭头生成超量方块的缓解机制：
+      // 如果生成的方块数量大于 4，并且生成的方块所在行只有一个方块的时候，
+      // 添加倒计时销毁效果。在玩家放置图形时，依次消除刚刚生成的满足条件的方块，
+      // 直到箭头生成的方块数量不大于 4。
+      if (fx === 'ne' || fx === 'nw') {
+        const generated = touched.filter(([, , added]) => added === 1);
+        if (generated.length > 4) {
+          const excess = generated.length - 4;
+          // 筛选：生成的方块所在行只有一个方块
+          const loneBlocks = generated
+            .map(([cx, cy]) => ({ x: cx, y: cy }))
+            .filter((pos) => this.board[pos.y].filter(Boolean).length === 1)
+            // 优先消除靠上方的危险孤立方块（y 升序）
+            .sort((a, b) => a.y - b.y);
+
+          const toDecay = loneBlocks.slice(0, excess);
+          for (let i = 0; i < toDecay.length; i++) {
+            const block = toDecay[i];
+            const currentCell = this.board[block.y][block.x];
+            if (currentCell) {
+              const countdown = this.decayQueue.length + 1;
+              currentCell.decay = countdown;
+              this.decayQueue.push({ x: block.x, y: block.y, countdown });
+            }
+          }
+        }
+      }
     }
     if (cellsCleared) this.score += cellsCleared * LASER_CELL_SCORE * this.level;
 
@@ -335,6 +432,7 @@ export class TetrisGame {
     if (full.length && this.combo < MAX_COMBO) {
       this.combo += 1;
       this.clearingRows = full;
+      this.clearPhase = 0;
       this.clearTimer = 0;
       this.state = 'clearing'; // 留在 clearing：下一波动画结束后再次进入本方法
       this.fxEvents.push({ type: 'clear', rows: full.slice() });
@@ -344,13 +442,23 @@ export class TetrisGame {
       return;
     }
 
-    // 5. 连锁结束，恢复常规下落
+    // 5. 消行与连锁结束，进入消除后棋盘布局观察期（暂停图形下落，给玩家时间观察消除后的棋盘）
     this.combo = 0;
+    this.clearPhase = 1;
+    this.clearTimer = 0;
+    this.state = 'clearing';
+  }
+
+  /** 布局观察期结束，恢复游戏下落并生成新方块 */
+  #finishSettle() {
+    this.clearPhase = 0;
+    this.combo = 0;
+    this.state = 'playing';
     this.#spawn();
   }
 
   /** 对单个格子施加方向效果：正交=清除，斜向=取反；返回清除的格子数 */
-  #applyFx(x, y, dx, dy, queue, touched) {
+  #applyFx(x, y, dx, dy, queue, touched, fx) {
     const diagonal = dx !== 0 && dy !== 0;
     const cell = this.board[y][x];
     if (diagonal) {
@@ -360,6 +468,11 @@ export class TetrisGame {
         if (cell.fx) queue.push({ x, y, fx: cell.fx });
         touched.push([x, y, 0]);
         return 1;
+      }
+      // 东北 / 西北斜向箭头：如果生成的方块在顶部四行范围内（y < 4），则取消生成
+      // 防止堵住新生方块下落位置导致游戏直接结束
+      if ((fx === 'ne' || fx === 'nw') && y < 4) {
+        return 0;
       }
       this.board[y][x] = { t: 'X', fx: null };
       touched.push([x, y, 1]);

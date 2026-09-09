@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { FX_COLORS } from './constants.js';
 
 /** 8 方向 -> 箭头旋转角（弧度，up 为 0 朝上，逆时针为正） */
-const FX_ANGLE = {
+export const FX_ANGLE = {
   up: 0,
   ne: -Math.PI / 4,
   right: -Math.PI / 2,
@@ -91,5 +91,98 @@ export class FxMarkerPool {
     const o = 0.62 + 0.3 * Math.sin(time * 4);
     this.materials.laser.opacity = o;
     this.materials.magic.opacity = o;
+  }
+}
+
+function createOffscreenCanvas(width, height) {
+  let cvs = null;
+  if (typeof wx !== 'undefined' && typeof wx.createCanvas === 'function') {
+    cvs = wx.createCanvas();
+  } else if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+    cvs = document.createElement('canvas');
+  }
+  if (cvs) {
+    cvs.width = width;
+    cvs.height = height;
+  }
+  return cvs;
+}
+
+function makeDigitTexture(num) {
+  const cvs = createOffscreenCanvas(64, 64);
+  if (!cvs) return null;
+  const ctx = cvs.getContext('2d');
+  if (!ctx) return null;
+  ctx.clearRect(0, 0, 64, 64);
+
+  // 金橙色圆环底纹
+  ctx.beginPath();
+  ctx.arc(32, 32, 27, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(245, 158, 11, 0.92)';
+  ctx.fill();
+  ctx.lineWidth = 3.5;
+  ctx.strokeStyle = '#ffffff';
+  ctx.stroke();
+
+  // 居中倒计时数字
+  ctx.font = 'bold 36px sans-serif';
+  ctx.fillStyle = '#0f172a';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(num), 32, 33);
+
+  const tex = new THREE.CanvasTexture(cvs);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearFilter;
+  return tex;
+}
+
+/**
+ * 倒计时销毁方块标记池（展示 1, 2, 3, 4 等步数数字）
+ */
+export class DecayMarkerPool {
+  constructor(scene, max = 32) {
+    this.geo = new THREE.PlaneGeometry(0.55, 0.55);
+    this.textures = {};
+    this.materials = {};
+    for (let i = 1; i <= 8; i++) {
+      const tex = makeDigitTexture(i);
+      this.textures[i] = tex;
+      this.materials[i] = new THREE.MeshBasicMaterial({
+        map: tex,
+        transparent: true,
+        opacity: 0.95,
+        depthWrite: false,
+      });
+    }
+
+    this.pool = [];
+    this._n = 0;
+    for (let i = 0; i < max; i++) {
+      const m = new THREE.Mesh(this.geo, this.materials[1]);
+      m.visible = false;
+      scene.add(m);
+      this.pool.push(m);
+    }
+  }
+
+  begin() {
+    this._n = 0;
+  }
+
+  place(x, y, num) {
+    const m = this.pool[this._n++];
+    if (!m) return;
+    const n = Math.max(1, Math.min(8, num || 1));
+    m.material = this.materials[n];
+    m.position.set(x, y, 0.52);
+    m.visible = true;
+  }
+
+  end() {
+    for (let i = this._n; i < this.pool.length; i++) {
+      this.pool[i].visible = false;
+    }
   }
 }

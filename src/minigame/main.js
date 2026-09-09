@@ -10,10 +10,17 @@ import { COLS, ROWS } from '../constants.js';
 
 /* ================= 窗口信息 ================= */
 
-const win = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
-let W = win.windowWidth;
-let H = win.windowHeight;
+let win;
+try {
+  win = wx.getWindowInfo ? wx.getWindowInfo() : (wx.getSystemInfoSync ? wx.getSystemInfoSync() : null);
+} catch (e) {
+  // 基础库或 JSBridge 极早初始化阶段若暂不可用，安全捕获并使用默认安全值
+}
+win = win || {};
+let W = win.windowWidth || 375;
+let H = win.windowHeight || 667;
 const TOP = (win.safeArea && win.safeArea.top) || 0;
+let BOTTOM_INSET = Math.max(0, H - ((win.safeArea && win.safeArea.bottom) || H));
 
 /* ================= 渲染器 ================= */
 
@@ -93,7 +100,7 @@ try {
 } catch (e) { /* 忽略 */ }
 
 const ui = new GameUI(BASE_DPR, dpadSide);
-ui.resize(W, H, TOP);
+ui.resize(W, H, TOP, BOTTOM_INSET);
 
 const uiScene = new THREE.Scene();
 const uiCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -131,8 +138,11 @@ wx.onWindowResize &&
   wx.onWindowResize((res) => {
     W = res.windowWidth;
     H = res.windowHeight;
+    const curWin = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
+    const curTop = (curWin.safeArea && curWin.safeArea.top) || 0;
+    BOTTOM_INSET = Math.max(0, H - ((curWin.safeArea && curWin.safeArea.bottom) || H));
     applySize();
-    ui.resize(W, H, TOP);
+    ui.resize(W, H, curTop, BOTTOM_INSET);
     fitCamera();
   });
 

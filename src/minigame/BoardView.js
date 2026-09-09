@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { COLS, ROWS, CELL, COLORS, CLEAR_TIME, FX_COLORS } from '../constants.js';
-import { FxMarkerPool } from '../fxMarker.js';
+import { FxMarkerPool, DecayMarkerPool, FX_ANGLE } from '../fxMarker.js';
 import { FxParticles, FxBeams } from '../fxParticles.js';
 
 /** 格子坐标 -> 世界坐标（棋盘中心为原点，行 0 在顶部） */
@@ -75,7 +75,8 @@ export class BoardView {
 
     // 特殊格激光方向箭头（锁定后 / 下落中都能一眼看出位置与朝向）
     this.fx = new FxMarkerPool(scene);
-    this.activeFx = new THREE.Mesh(this.fx.geometry, this.fx.materials.up);
+    this.decay = new DecayMarkerPool(scene); // 倒计时销毁数字标记
+    this.activeFx = new THREE.Mesh(this.fx.geometry, this.fx.materials.laser);
     this.activeFx.visible = false;
     scene.add(this.activeFx);
 
@@ -192,6 +193,12 @@ export class BoardView {
           this.particles.burst(px, py, col, added ? 2 : 3, 0.8);
         }
         this.shake = Math.min(0.35, this.shake + 0.12);
+      } else if (ev.type === 'decay') {
+        // 倒计时方块销毁：金色与浅紫色碎裂火花
+        const [x, y] = cellToWorld(ev.y, ev.x);
+        this.particles.burst(x, y, 0xfbbf24, 8, 1.2);
+        this.particles.burst(x, y, 0xa78bfa, 5, 0.9);
+        this.shake = Math.min(0.25, this.shake + 0.08);
       }
     }
     events.length = 0;
@@ -201,16 +208,17 @@ export class BoardView {
     const clearing = new Set(game.clearingRows);
     const isClearing = clearing.size > 0;
 
-    // 1. 已锁定方块：仅棋盘变化或消行动画期间重写实例数据
+    // 1. 已锁定方块：仅棋盘变化（包括倒计时步数变化）或消行动画期间重写实例数据
     let key = '';
     for (let r = 0; r < ROWS; r++) {
-      key += game.board[r].map((v) => (v ? v.t + (v.fx || '') : '')).join(',') + '|';
+      key += game.board[r].map((v) => (v ? v.t + (v.fx || '') + (v.decay || '') : '')).join(',') + '|';
     }
     this._consumeEvents(game);
     if (key !== this._boardKey || isClearing || this._wasClearing) {
       this._boardKey = key;
       this._wasClearing = isClearing;
       this.fx.begin();
+      this.decay.begin();
       const phase = Math.min(1, game.clearTimer / CLEAR_TIME);
       let i = 0;
       for (let r = 0; r < ROWS; r++) {
@@ -232,15 +240,22 @@ export class BoardView {
           this._m.makeScale(s, s, s);
           this._m.setPosition(x, y, 0);
           this.settled.setMatrixAt(i, this._m);
-          // 特殊格向效果色偏亮提示（直线青 / 斜向紫）；消行时颜色加速向白色过渡
-          this._c.setHex(COLORS[cell.t]);
-          if (clearing.has(r)) this._c.lerp(this._white, Math.min(1, phase * 2.5));
-          else if (cell.fx) this._c.lerp(this._fxc.setHex(FX_COLORS[cell.fx]), 0.5);
-          this.settled.setColorAt(i, this._c);
-          if (cell.fx) this.fx.place(x, y, cell.fx);
+          // 倒计时销毁方块：琥珀金橙色高亮
+          if (cell.decay) {
+            this._c.setHex(0xf59e0b);
+            this.settled.setColorAt(i, this._c);
+            this.decay.place(x, y, cell.decay);
+          } else {
+            this._c.setHex(COLORS[cell.t]);
+            if (clearing.has(r)) this._c.lerp(this._white, Math.min(1, phase * 2.5));
+            else if (cell.fx) this._c.lerp(this._fxc.setHex(FX_COLORS[cell.fx]), 0.5);
+            this.settled.setColorAt(i, this._c);
+            if (cell.fx) this.fx.place(x, y, cell.fx);
+          }
         }
       }
       this.fx.end();
+      this.decay.end();
       this.settled.instanceMatrix.needsUpdate = true;
       if (this.settled.instanceColor) this.settled.instanceColor.needsUpdate = true;
     }
@@ -267,7 +282,7 @@ export class BoardView {
 
           if (isSpecial) {
             this.activeFx.position.set(wx, wy, 0.5);
-            this.activeFx.rotation.z = special.fx === 'down' ? Math.PI : 0;
+            this.activeFx.rotation.z = FX_ANGLE[special.fx] ?? 0;
             this.activeFx.material = this.fx.matFor(special.fx);
             this.activeFx.visible = true;
           }

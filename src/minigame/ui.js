@@ -54,8 +54,9 @@ export class GameUI {
     this.W = 0;
     this.H = 0;
     this.top = 0; // 刘海安全区高度
+    this.bottom = 0; // 底部安全区高度（Home Bar）
     this.side = side === 'right' ? 'right' : 'left';
-    this.controls = {}; // 十字键四臂 / 开始 / 选择 的命中区
+    this.controls = {}; // 十字键四臂 / 暂停 / 切换按键 的命中区
     this.itemPanel = null; // 道具预留面板
     this.deckY = 0;
     this.deckH = 0;
@@ -80,10 +81,11 @@ export class GameUI {
     this.dirty = true;
   }
 
-  resize(W, H, top) {
+  resize(W, H, top, bottom) {
     this.W = W;
     this.H = H;
     this.top = top || 0;
+    this.bottom = bottom || 0;
     this.canvas.width = Math.round(W * this.scale);
     this.canvas.height = Math.round(H * this.scale);
     this.ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
@@ -93,12 +95,18 @@ export class GameUI {
 
   _layout() {
     const { W, H } = this;
-    const m = 10;
-    const deckH = Math.min(136, Math.max(112, Math.floor(H * 0.17)));
+    const m = 12;
+    // 底部安全区适配：iOS Home Indicator 通常约为 34px，保底至少 12px
+    const bottomInset = Math.max(this.bottom || 0, 12);
+    // 十字键外径尺寸（适中大小，不超出下界）
+    const cross = Math.max(116, Math.min(138, Math.floor(W * 0.34)));
+    const arm = Math.floor(cross / 3);
+    const topPad = 12;
+    const bottomPad = 10;
+    const deckH = cross + topPad + bottomPad + bottomInset;
     const deckY = H - deckH;
-    const cy = deckY + deckH / 2;
-    const cross = Math.max(116, Math.min(152, Math.floor(W * 0.36))); // 十字键外径
-    const arm = Math.floor(cross / 3); // 臂厚
+    // 控件垂直中心：确保十字键下边缘与底部安全区保留 bottomPad 间距，彻底避开 Home Bar
+    const cy = deckY + topPad + cross / 2;
     const cx = this.side === 'left' ? m + cross / 2 : W - m - cross / 2;
 
     this.deckY = deckY;
@@ -112,38 +120,64 @@ export class GameUI {
       right: { x: cx + cross / 2 - arm, y: cy - arm / 2, w: arm, h: arm },
     };
 
-    // 中部区（药丸键）+ 对侧道具槽
-    const zoneX = this.side === 'left' ? m + cross + 8 : m;
-    const zoneW = W - m * 2 - cross - 16;
-    const itemW = Math.max(84, Math.min(112, Math.floor(zoneW * 0.46)));
+    // 道具预留槽面板（与十字键垂直中心对称）
+    const zoneX = this.side === 'left' ? m + cross + 10 : m;
+    const zoneW = W - m * 2 - cross - 20;
+    const itemW = Math.max(86, Math.min(114, Math.floor(zoneW * 0.48)));
+    const itemH = Math.min(cross, cross - 10);
     const itemX = this.side === 'left' ? W - m - itemW : m;
-    this.itemPanel = { x: itemX, y: cy - (deckH - 22) / 2, w: itemW, h: deckH - 22 };
+    this.itemPanel = { x: itemX, y: cy - itemH / 2, w: itemW, h: itemH };
 
-    const pillW = Math.max(52, Math.min(70, zoneW - itemW - 12));
-    const pillH = 24;
+    // 中部控制区：仅保留一枚独立的“暂停 / 开始”胶囊键，居中对称
+    const pillW = Math.max(56, Math.min(74, zoneW - itemW - 14));
+    const pillH = 32;
     const pillCx =
       this.side === 'left'
         ? zoneX + (zoneW - itemW) / 2
         : zoneX + itemW + (zoneW - itemW) / 2;
-    this.controls.select = { x: pillCx - pillW / 2, y: cy - pillH - 5, w: pillW, h: pillH };
-    this.controls.start = { x: pillCx - pillW / 2, y: cy + 5, w: pillW, h: pillH };
+    this.controls.pause = { x: pillCx - pillW / 2, y: cy - pillH / 2, w: pillW, h: pillH };
+
+    // 顶部 HUD 区域的防误触“左右手”快捷切换按钮（位于记分板与 NEXT 之间，避开微信胶囊）
+    const topBtnW = 68;
+    const topBtnH = 26;
+    const topBtnY = this.top + 14;
+    const topBtnX = Math.round(194 + (W - 96 - 194 - topBtnW) / 2);
+    this.controls.swapTop = { x: topBtnX, y: topBtnY, w: topBtnW, h: topBtnH };
+
+    // 浮层（Overlay）内部的左右手切换按钮（占位，实际在 _drawOverlay 绘制时精确定位）
+    const pw = Math.min(W - 48, 340);
+    const px = (W - pw) / 2;
+    const swW = 200;
+    const swH = 34;
+    this.controls.swapOverlay = {
+      x: px + (pw - swW) / 2,
+      y: (H - 260) / 2 + 130,
+      w: swW,
+      h: swH,
+    };
   }
 
   /**
    * 命中测试。
-   * 游戏中：up/down/left/right/start/select；浮层状态：仅暴露 select（可先切布局再开始）。
+   * 游戏中：up/down/left/right/pause/swapTop；
+   * 浮层状态：swapOverlay/swapTop 响应切换左右手，主区域响应主按钮。
    */
   hitControl(x, y) {
     const playing = this._cache.state === 'playing' || this._cache.state === 'clearing';
     const c = this.controls;
     const inR = (r) => r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
     if (playing) {
-      for (const k of ['up', 'down', 'left', 'right', 'start', 'select']) {
+      if (inR(c.swapTop)) return 'swapTop';
+      for (const k of ['up', 'down', 'left', 'right', 'pause']) {
         if (inR(c[k])) return k;
       }
       return null;
     }
-    return inR(c.select, x, y) ? 'select' : null;
+    // 浮层非游戏状态
+    if (inR(c.swapOverlay)) return 'swapOverlay';
+    if (inR(c.swapTop)) return 'swapTop';
+    if (inR(c.primary)) return 'primary';
+    return null;
   }
 
   setPressed(name) {
@@ -313,6 +347,23 @@ export class GameUI {
       c.restore();
     }
     c.textAlign = 'left';
+    // ---- 顶部防误触左右手快捷切换按键 ----
+    const tb = this.controls.swapTop;
+    if (tb) {
+      const isRight = this.side === 'right';
+      c.fillStyle = 'rgba(13, 18, 38, 0.72)';
+      c.strokeStyle = 'rgba(120, 140, 255, 0.35)';
+      c.lineWidth = 1;
+      this._rr(c, tb.x, tb.y, tb.w, tb.h, 8);
+      c.fill();
+      c.stroke();
+
+      c.font = `500 11px ${FONT}`;
+      c.fillStyle = '#aab6dd';
+      c.textAlign = 'center';
+      c.fillText(isRight ? '🖐 右手' : '🖐 左手', tb.x + tb.w / 2, tb.y + tb.h / 2 + 3.5);
+      c.textAlign = 'left';
+    }
   }
 
   /* ---------- 手柄控制台 ---------- */
@@ -322,7 +373,7 @@ export class GameUI {
     const { W, deckY, deckH } = this;
 
     // 控制台底板
-    c.fillStyle = 'rgba(9, 12, 24, 0.5)';
+    c.fillStyle = 'rgba(9, 12, 24, 0.55)';
     c.fillRect(0, deckY, W, deckH);
     c.strokeStyle = BORDER;
     c.lineWidth = 1;
@@ -333,8 +384,7 @@ export class GameUI {
 
     this._drawDpad(c);
     this._drawItemPanel(c);
-    this._drawPill(c, 'select');
-    this._drawPill(c, 'start');
+    this._drawPauseButton(c);
   }
 
   _drawDpad(c) {
@@ -414,19 +464,21 @@ export class GameUI {
     c.textAlign = 'left';
   }
 
-  _drawPill(c, name) {
-    const r = this.controls[name];
-    const isStart = name === 'start';
-    c.fillStyle = 'rgba(13, 18, 38, 0.8)';
-    c.strokeStyle = isStart ? ACCENT : 'rgba(125, 139, 176, 0.7)';
+  _drawPauseButton(c) {
+    const r = this.controls.pause;
+    if (!r) return;
+    const pressed = this._cache.pressed === 'pause';
+    c.fillStyle = pressed ? 'rgba(34, 211, 238, 0.25)' : 'rgba(13, 18, 38, 0.85)';
+    c.strokeStyle = pressed ? ACCENT : 'rgba(125, 139, 176, 0.65)';
     c.lineWidth = 1;
     this._rr(c, r.x, r.y, r.w, r.h, r.h / 2);
     c.fill();
     c.stroke();
-    c.fillStyle = isStart ? ACCENT : '#aab6dd';
-    c.font = `600 10px ${FONT}`;
+
+    c.fillStyle = pressed ? ACCENT : '#c5d1ec';
+    c.font = `600 11px ${FONT}`;
     c.textAlign = 'center';
-    c.fillText(isStart ? '开 始' : '选 择', r.x + r.w / 2, r.y + r.h / 2 + 3.5);
+    c.fillText('暂 停', r.x + r.w / 2, r.y + r.h / 2 + 4);
     c.textAlign = 'left';
   }
 
@@ -437,14 +489,14 @@ export class GameUI {
     const { W, H } = this;
 
     // 半透明遮罩
-    c.fillStyle = 'rgba(5, 8, 18, 0.6)';
+    c.fillStyle = 'rgba(5, 8, 18, 0.65)';
     c.fillRect(0, 0, W, H);
 
-    const pw = Math.min(W - 48, 340);
+    const pw = Math.min(W - 48, 330);
     const state = game.state;
-    const ph = state === 'gameover' ? 252 : state === 'ready' ? 260 : 216;
+    const ph = state === 'gameover' ? 280 : state === 'ready' ? 288 : 240;
     const px = (W - pw) / 2;
-    const py = (H - ph) / 2 - 30;
+    const py = (H - ph) / 2 - 20;
     this._panel(c, px, py, pw, ph);
 
     c.textAlign = 'center';
@@ -454,33 +506,61 @@ export class GameUI {
     c.fillStyle = ACCENT;
     c.font = `700 32px ${FONT}`;
     const title = state === 'ready' ? '3D TETRIS' : state === 'paused' ? 'PAUSED' : 'GAME OVER';
-    c.fillText(title, W / 2, py + 64);
+    c.fillText(title, W / 2, py + 56);
     c.shadowBlur = 0;
 
     c.font = `12px ${FONT}`;
     c.fillStyle = '#9fb0d8';
+    let swY = py + 160;
     if (state === 'ready') {
-      c.fillText('十字键 ←→ 移动 · ↑ 旋转', W / 2, py + 96);
-      c.fillText('↓ 加速 · 连按两下↓ 直接落地', W / 2, py + 118);
-      c.fillText('发光格 8 向效果：直线清除 · 斜向取反', W / 2, py + 140);
-      c.fillText('「选择」键切换左右手布局', W / 2, py + 162);
+      c.fillText('十字键 ←→ 移动 · ↑ 旋转', W / 2, py + 88);
+      c.fillText('↓ 加速 · 连按两下↓ 直接落地', W / 2, py + 110);
+      c.fillText('发光格 8 向效果：直线清除 · 斜向取反', W / 2, py + 132);
+      swY = py + 158;
     } else if (state === 'paused') {
-      c.fillText('点击任意处继续', W / 2, py + 116);
+      c.fillText('游戏已暂停', W / 2, py + 92);
+      swY = py + 120;
     } else {
       c.font = `700 22px ${FONT}`;
       c.fillStyle = ACCENT;
-      c.fillText(`本局得分  ${game.score}`, W / 2, py + 106);
+      c.fillText(`本局得分  ${game.score}`, W / 2, py + 94);
       c.font = `12px ${FONT}`;
       c.fillStyle = '#9fb0d8';
-      c.fillText(`消除 ${game.lines} 行 · 等级 ${game.level}`, W / 2, py + 136);
-      c.fillText(`最高分 ${Math.max(best, game.score)}`, W / 2, py + 160);
+      c.fillText(`消除 ${game.lines} 行 · 等级 ${game.level}`, W / 2, py + 122);
+      c.fillText(`最高分 ${Math.max(best, game.score)}`, W / 2, py + 144);
+      swY = py + 164;
     }
 
-    // 主按钮
+    // 左右手布局设置按键（在浮层中，防误触）
+    const swW = 200;
+    const swH = 34;
+    const swX = px + (pw - swW) / 2;
+    this.controls.swapOverlay = { x: swX, y: swY, w: swW, h: swH };
+
+    const isRight = this.side === 'right';
+    c.fillStyle = 'rgba(20, 28, 58, 0.85)';
+    c.strokeStyle = 'rgba(120, 140, 255, 0.45)';
+    c.lineWidth = 1;
+    this._rr(c, swX, swY, swW, swH, swH / 2);
+    c.fill();
+    c.stroke();
+
+    c.font = `500 12px ${FONT}`;
+    c.fillStyle = '#c5d1ec';
+    c.textAlign = 'center';
+    c.fillText(
+      isRight ? '🖐 操作模式：右手 (点击切换)' : '🖐 操作模式：左手 (点击切换)',
+      swX + swW / 2,
+      swY + swH / 2 + 4
+    );
+
+    // 主操作按钮
     const bw = 184;
-    const bh = 46;
+    const bh = 44;
     const bx = (W - bw) / 2;
-    const by = py + ph - bh - 22;
+    const by = py + ph - bh - 20;
+    this.controls.primary = { x: bx, y: by, w: bw, h: bh };
+
     const grad = c.createLinearGradient(bx, by, bx + bw, by + bh);
     grad.addColorStop(0, '#22d3ee');
     grad.addColorStop(1, '#4f8dff');
@@ -492,16 +572,7 @@ export class GameUI {
     c.fillText(
       state === 'ready' ? '开始游戏' : state === 'paused' ? '继续游戏' : '再来一局',
       W / 2,
-      by + 29
+      by + 28
     );
-
-    // 浮层上也暴露「选择」键：开始前就能切好左右手
-    this._drawPill(c, 'select');
-    c.font = `10px ${FONT}`;
-    c.fillStyle = '#9fb0d8';
-    c.textAlign = 'left';
-    const sr = this.controls.select;
-    c.fillText('切换左右手', sr.x + sr.w + 8, sr.y + sr.h / 2 + 3.5);
-    c.textAlign = 'center';
   }
 }

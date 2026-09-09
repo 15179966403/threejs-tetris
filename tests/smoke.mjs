@@ -1,6 +1,6 @@
 // 临时逻辑冒烟测试：node tests/smoke.mjs
 import { TetrisGame } from '../src/TetrisGame.js';
-import { COLS, ROWS, SHAPES, FX_TYPES } from '../src/constants.js';
+import { COLS, ROWS, SHAPES, FX_TYPES, CLEAR_TIME, SETTLE_TIME } from '../src/constants.js';
 
 let failures = 0;
 const check = (name, cond) => {
@@ -286,6 +286,95 @@ const check = (name, cond) => {
   check('连锁后回到 playing', g.state === 'playing' && g.current !== null);
   check('连锁波次归零', g.combo === 0);
   check('连锁得分（800×2 倍率）', g.score === 1600);
+}
+
+// 12. 东北/西北斜向箭头超量孤立方块倒计时销毁机制
+{
+  const g = new TetrisGame();
+  g.start();
+  // 底部第 19 行放一个 nw 箭头，上方全部为空
+  g.board[19][9] = { t: 'O', fx: 'nw' };
+  g.clearingRows = [19];
+  g.clearTimer = 1;
+  g.state = 'clearing';
+  g.update(1); // 触发消行与 nw 激光取反
+  // nw 会在 (8,18)..(0,10) 共生成 9 个方块，各所在行均只有 1 个方块
+  // 9 > 4，excess = 5，需安排 5 个孤立方块倒计时销毁
+  check('nw 生成 9 个方块超量触发倒计时队列', g.decayQueue.length === 5);
+  check('最顶层孤立块被标记为第 1 个销毁', g.decayQueue[0].y === 10 && g.decayQueue[0].countdown === 1);
+  check('对应格子上带有 decay 属性', g.board[10][0].decay === 1);
+
+  // 玩家放置第 1 个方块（通过 hardDrop 模拟锁定）
+  g.hardDrop();
+  check('放置 1 块后消除了 1 个超量孤立块', g.board[10][0] === null);
+  check('倒计时队列剩余 4 个', g.decayQueue.length === 4);
+  check('下一块倒计时递减为 1', g.decayQueue[0].countdown === 1 && g.board[11][1].decay === 1);
+
+  // 连续再放置 4 个方块，直到超量孤立块全部销毁完毕
+  for (let i = 0; i < 4; i++) {
+    if (g.state === 'playing') g.hardDrop();
+  }
+  check('超量孤立方块已全部倒计时销毁', g.decayQueue.length === 0);
+  // 统计原来 nw 在棋盘上生成的剩余方块数（排除了放置过程中落在这些位置的方块）
+  const remainingGenerated = [15, 16, 17, 18].filter((r) => g.board[r] && g.board[r][r - 10] && g.board[r][r - 10].t === 'X');
+  check('箭头生成的剩余方块数量不大于 4', remainingGenerated.length <= 4);
+}
+
+// 13. 东北/西北斜向箭头在顶部四行（y < 4）取消生成
+{
+  const g = new TetrisGame();
+  g.start();
+  // 在第 8 行放置一个 nw 特殊格，上方全为空
+  // nw 轨迹为 (c-1, r-1): (6, 7), (5, 6), (4, 5), (3, 4), (2, 3), (1, 2), (0, 1)
+  g.board[8][7] = { t: 'O', fx: 'nw' };
+  g.clearingRows = [8];
+  g.clearTimer = 1;
+  g.state = 'clearing';
+  g.update(1); // 触发消行
+
+  // 检查顶部 4 行（行号 0, 1, 2, 3）是否全部未生成方块
+  const top4RowsBlocks = [0, 1, 2, 3].flatMap((r) => g.board[r].filter(Boolean));
+  check('顶部四行（y < 4）取消生成任何方块', top4RowsBlocks.length === 0);
+
+  // 检查行 4..7 上是否正常生成了方块
+  check('非顶部四行（y >= 4）正常生成取反方块', g.board[4][3] !== null && g.board[5][4] !== null);
+}
+
+// 14. 消行两阶段：动画期(CLEAR_TIME)与观察期(SETTLE_TIME)暂停图形下落
+{
+  const g = new TetrisGame({ specialChance: 0 });
+  g.start();
+  // 填满第 19 行除最后 1 列
+  for (let c = 0; c < COLS - 1; c++) g.board[ROWS - 1][c] = { t: 'I', fx: null };
+  g.board[ROWS - 2][3] = { t: 'T', fx: null };
+
+  // 人工触发消行：进入第 0 阶段（闪光缩放）
+  g.clearingRows = [ROWS - 1];
+  g.clearPhase = 0;
+  g.clearTimer = 0;
+  g.state = 'clearing';
+  g.current = null;
+
+  // 推进 0.2 秒（未达到 CLEAR_TIME=0.35s）
+  g.update(0.2);
+  check('消行动画期间保持 clearing 状态', g.state === 'clearing');
+  check('消行动画期间处于 phase 0', g.clearPhase === 0);
+  check('消行动画期间无下落方块', g.current === null);
+  check('消行动画期间禁止移动操作', g.move(1, 0) === false);
+
+  // 再推进 0.2 秒（累计 0.4s > CLEAR_TIME 0.35s，但仍在 SETTLE_TIME 0.5s 观察期内）
+  g.update(0.2);
+  check('动画结束进入 phase 1 布局观察期', g.clearPhase === 1);
+  check('观察期内状态保持 clearing', g.state === 'clearing');
+  check('观察期内棋盘已消除下移', g.board[ROWS - 1][3] && g.board[ROWS - 1][3].t === 'T');
+  check('观察期内暂停图形下落（current 仍为 null）', g.current === null);
+  check('观察期内禁止移动或旋转', g.rotate(1) === false && g.softDrop() === false);
+
+  // 推进至观察期结束（再推进 0.5s，超过 SETTLE_TIME）
+  g.update(0.5);
+  check('观察期结束后回到 phase 0', g.clearPhase === 0);
+  check('观察期结束后恢复 playing 状态', g.state === 'playing');
+  check('新方块生成并开始下落', g.current !== null && g.current.y === -1);
 }
 
 console.log(failures === 0 ? '\n全部通过 ✔' : `\n${failures} 项失败 ✘`);

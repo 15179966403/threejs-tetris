@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { COLS, ROWS, CELL, COLORS, CLEAR_TIME, FX_COLORS } from './constants.js';
-import { FxMarkerPool } from './fxMarker.js';
+import { FxMarkerPool, DecayMarkerPool, FX_ANGLE } from './fxMarker.js';
 import { FxParticles, FxBeams } from './fxParticles.js';
 
 /** 格子坐标 -> 世界坐标（棋盘中心为原点，行 0 在顶部） */
@@ -60,7 +60,8 @@ export class BoardView {
 
     // 特殊格激光方向箭头（锁定后 / 下落中都能一眼看出位置与朝向）
     this.fx = new FxMarkerPool(scene);
-    this.activeFx = new THREE.Mesh(this.fx.geometry, this.fx.materials.up);
+    this.decay = new DecayMarkerPool(scene);
+    this.activeFx = new THREE.Mesh(this.fx.geometry, this.fx.materials.laser);
     this.activeFx.visible = false;
     scene.add(this.activeFx);
 
@@ -177,6 +178,11 @@ export class BoardView {
           this.particles.burst(px, py, col, added ? 2 : 3, 0.8);
         }
         this.shake = Math.min(0.35, this.shake + 0.12);
+      } else if (ev.type === 'decay') {
+        const [x, y] = cellToWorld(ev.y, ev.x);
+        this.particles.burst(x, y, 0xfbbf24, 8, 1.2);
+        this.particles.burst(x, y, 0xa78bfa, 5, 0.9);
+        this.shake = Math.min(0.25, this.shake + 0.08);
       }
     }
     events.length = 0;
@@ -186,6 +192,7 @@ export class BoardView {
     // 1. 已锁定方块
     const clearing = new Set(game.clearingRows);
     this.fx.begin();
+    this.decay.begin();
     this._consumeEvents(game);
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
@@ -207,6 +214,13 @@ export class BoardView {
               ? 1 + 0.3 * (phase / 0.3)
               : Math.max(0, 1.3 * (1 - (phase - 0.3) / 0.7));
           mesh.scale.setScalar(s);
+        } else if (cell.decay) {
+          // 倒计时方块：琥珀金橙色脉冲高亮
+          mesh.material.emissive.setHex(0xf59e0b);
+          mesh.material.emissiveIntensity = 0.55;
+          mesh.scale.setScalar(1);
+          const [fx, fy] = cellToWorld(r, c);
+          this.decay.place(fx, fy, cell.decay);
         } else if (cell.fx) {
           // 特殊格：按激光方向常亮发光提示（↑青 / ↓橙）
           mesh.material.emissive.setHex(FX_COLORS[cell.fx]);
@@ -220,6 +234,8 @@ export class BoardView {
         }
       }
     }
+    this.fx.end();
+    this.decay.end();
 
     // 2. 活动方块 + 落点投影
     let ai = 0;
@@ -249,7 +265,7 @@ export class BoardView {
           // 下落中的特殊格：箭头标记实时跟随
           if (special && special.r === r && special.c === c) {
             this.activeFx.position.set(wx, wy, 0.5);
-            this.activeFx.rotation.z = special.fx === 'down' ? Math.PI : 0;
+            this.activeFx.rotation.z = FX_ANGLE[special.fx] ?? 0;
             this.activeFx.material = this.fx.matFor(special.fx);
             this.activeFx.visible = true;
           }

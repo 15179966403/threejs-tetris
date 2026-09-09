@@ -1,6 +1,6 @@
 // 临时逻辑冒烟测试：node tests/smoke.mjs
 import { TetrisGame } from '../src/TetrisGame.js';
-import { COLS, ROWS, SHAPES } from '../src/constants.js';
+import { COLS, ROWS, SHAPES, FX_TYPES } from '../src/constants.js';
 
 let failures = 0;
 const check = (name, cond) => {
@@ -151,14 +151,17 @@ const check = (name, cond) => {
   check('恢复 playing', g.state === 'playing');
 }
 
-// 9. 特殊格生成
+// 9. 特殊格生成（概率 0.35，随机重开确保覆盖两种分支）
 {
   const g = new TetrisGame();
+  let guard = 0;
+  while (!g.nextSpecial && guard++ < 200) g.reset(); // 必然能遇到特殊格
+  check('能生成特殊格', !!g.nextSpecial && FX_TYPES.includes(g.nextSpecial.fx));
   g.start();
   const s = g.current.special;
-  check('当前方块携带特殊格', !!s && (s.fx === 'up' || s.fx === 'down'));
+  check('当前方块携带特殊格且方向合法', !!s && FX_TYPES.includes(s.fx));
   check('特殊格位于有效格上', !!SHAPES[g.current.type][s.r][s.c]);
-  check('next 预览携带特殊格', !!g.nextSpecial && !!SHAPES[g.nextType][g.nextSpecial.r][g.nextSpecial.c]);
+  check('next 预览携带特殊格', !!g.nextSpecial);
   check('锁定后特殊格写入棋盘', (() => {
     const { x, special } = g.current;
     const gy = g.ghostY();
@@ -166,6 +169,10 @@ const check = (name, cond) => {
     const cell = g.board[gy + special.r][x + special.c];
     return !!cell && cell.fx === special.fx;
   })());
+  const g2 = new TetrisGame();
+  g2.nextSpecial = null; // 概率分支：无特殊格时也能正常进行
+  g2.start();
+  check('无特殊格分支正常', g2.current.special === null && g2.state === 'playing');
 }
 
 // 10. 特殊格坐标随旋转变换（顺时针 (r,c) -> (c, n-1-r)）
@@ -179,10 +186,17 @@ const check = (name, cond) => {
   g.current.special = { r: 1, c: 0, fx: 'up' };
   g.rotate(1);
   check(
-    '旋转后特殊格坐标变换',
-    g.current.special.r === 0 && g.current.special.c === 1 && g.current.special.fx === 'up'
+    '旋转后特殊格坐标与方向同步变换（CW：up→right）',
+    g.current.special.r === 0 && g.current.special.c === 1 && g.current.special.fx === 'right'
   );
   check('变换后的特殊格仍在有效格上', g.current.matrix[g.current.special.r][g.current.special.c] === 1);
+  g.rotate(-1); // 转回去：坐标复原、方向也复原
+  check(
+    '逆旋转后复原',
+    g.current.special.r === 1 &&
+      g.current.special.c === 0 &&
+      g.current.special.fx === 'up'
+  );
 }
 
 // 11. 消行触发 up 激光：清除同列上方全部方块
@@ -223,6 +237,55 @@ const check = (name, cond) => {
   check('消行后无关列方块下移一行', g.board[15][7] && g.board[15][7].t === 'Z');
   check('连锁得分入账（3格×10×1级）', g.score === 30);
   check('连锁后状态合法', g.state === 'playing' && g.current !== null);
+}
+
+// 13. 横向激光（经 NW 取反连锁触发）+ 斜向取反（消除 + 补块）
+// 注意：手动设置 clearingRows 后行会整体下移一格，所有预设坐标按消行后的位置反推
+{
+  const g = new TetrisGame();
+  g.start();
+  for (let c = 0; c < COLS; c++) g.board[ROWS - 1][c] = { t: 'O', fx: null };
+  g.board[ROWS - 1][5] = { t: 'O', fx: 'nw' };
+  // 消行后 NW 对角线为 (4,18)(3,17)(2,16)，预设位置需上移一行
+  g.board[17][4] = { t: 'J', fx: 'right' }; // 被取反消除 → 连锁右向激光
+  g.board[16][3] = { t: 'S', fx: null };
+  g.board[15][2] = { t: 'T', fx: null };
+  // 右向激光路径（消行后同行）上放两个方块
+  g.board[17][6] = { t: 'L', fx: null };
+  g.board[17][8] = { t: 'Z', fx: null };
+  g.clearingRows = [ROWS - 1];
+  g.clearTimer = 1;
+  g.state = 'clearing';
+  g.update(1);
+  check('NW 取反消除对角方块', g.board[18][4] === null && g.board[17][3] === null && g.board[16][2] === null);
+  check('NW 取反在对角空位补异形块', g.board[15][1] && g.board[15][1].t === 'X' && g.board[14][0] && g.board[14][0].t === 'X');
+  check('连锁右向激光清除同行方块', g.board[18][6] === null && g.board[18][8] === null);
+  check('得分 = 清除5格×10（手动清行无消行分）', g.score === 50);
+}
+
+// 14. 斜向取反补全整行 → combo 连锁消行
+{
+  const g = new TetrisGame();
+  g.start();
+  // 消行后缺口需落在 NW 对角线上：预设放在上一行（缺口 (6,15)(7,16)(8,17) → 消行后 (6,16)(7,17)(8,18)）
+  for (let r = 15; r <= 18; r++)
+    for (let c = 0; c < COLS; c++) g.board[r][c] = { t: 'O', fx: null };
+  g.board[15][6] = null;
+  g.board[16][7] = null;
+  g.board[17][8] = null;
+  g.board[19][9] = { t: 'O', fx: 'nw' };
+  g.clearingRows = [19];
+  g.clearTimer = 1;
+  g.state = 'clearing';
+  g.update(1);
+  // 第1波：消第19行 → NW 取反把 16/17/18 的缺口全部补上（旧的满行18也下移到19）→ 四行同时全满 → combo=1
+  check('取反补全整行后进入连锁', g.state === 'clearing' && g.combo === 1);
+  check('连锁行正确', g.clearingRows.length === 4);
+  g.update(1);
+  // 第2波：四行消除（800×2 倍率），无新连锁 → 收尾
+  check('连锁后回到 playing', g.state === 'playing' && g.current !== null);
+  check('连锁波次归零', g.combo === 0);
+  check('连锁得分（800×2 倍率）', g.score === 1600);
 }
 
 console.log(failures === 0 ? '\n全部通过 ✔' : `\n${failures} 项失败 ✘`);

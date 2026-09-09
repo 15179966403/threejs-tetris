@@ -78,7 +78,21 @@ const scoreEl = document.getElementById('score');
 const linesEl = document.getElementById('lines');
 const levelEl = document.getElementById('level');
 const nextGrid = document.getElementById('next-grid');
-for (let i = 0; i < 16; i++) nextGrid.appendChild(document.createElement('div'));
+for (let i = 0; i < 16; i++) {
+  const d = document.createElement('div');
+  d.style.display = 'flex';
+  d.style.alignItems = 'center';
+  d.style.justifyContent = 'center';
+  d.style.fontSize = '11px';
+  d.style.fontWeight = '700';
+  nextGrid.appendChild(d);
+}
+
+/** 特殊格方向 -> 字形 */
+const FX_GLYPH = {
+  up: '↑', ne: '↗', right: '→', se: '↘',
+  down: '↓', sw: '↙', left: '←', nw: '↖',
+};
 
 let lastNext = null;
 function updateNextPreview(type, special) {
@@ -89,6 +103,7 @@ function updateNextPreview(type, special) {
   for (const d of divs) {
     d.style.background = 'transparent';
     d.style.boxShadow = 'none';
+    d.textContent = '';
   }
   const shape = SHAPES[type];
   let minR = 4, maxR = -1, minC = 4, maxC = -1;
@@ -109,11 +124,13 @@ function updateNextPreview(type, special) {
       divs[idx].style.background = hex;
     })
   );
-  // 特殊格：按效果色描边
+  // 特殊格：按效果色描边 + 方向字形
   if (special) {
     const idx = (special.r - minR + offY) * 4 + (special.c - minC + offX);
     const fxHex = '#' + FX_COLORS[special.fx].toString(16).padStart(6, '0');
     divs[idx].style.boxShadow = `inset 0 0 0 2px ${fxHex}`;
+    divs[idx].textContent = FX_GLYPH[special.fx];
+    divs[idx].style.color = fxHex;
   }
 }
 
@@ -134,7 +151,7 @@ function refreshOverlay() {
   if (s === 'ready') {
     ovTitle.textContent = '3D TETRIS';
     ovText.innerHTML =
-      '← → 移动 · ↑ 旋转 · ↓ 软降<br>空格 硬降 · P 暂停 · R 重新开始<br>发光格随消行发射激光：↑清上方 · ↓清下方';
+      '← → 移动 · ↑ 旋转 · ↓ 软降<br>空格 硬降 · P 暂停 · R 重新开始<br>发光格 8 向效果：直线清除 · 斜向取反补块';
     ovBtn.textContent = '开始游戏';
   } else if (s === 'paused') {
     ovTitle.textContent = 'PAUSED';
@@ -195,6 +212,9 @@ window.addEventListener('keydown', (e) => {
 
 /* ================= 主循环 ================= */
 
+const comboEl = document.getElementById('combo');
+let lastComboKey = null;
+
 const clock = new THREE.Clock();
 let lastState = null;
 
@@ -208,6 +228,15 @@ function tick() {
   scoreEl.textContent = game.score;
   linesEl.textContent = game.lines;
   levelEl.textContent = game.level;
+
+  // 连锁波次提示
+  const comboKey = game.state === 'clearing' && game.combo >= 1 ? game.combo : null;
+  if (comboKey !== lastComboKey) {
+    lastComboKey = comboKey;
+    comboEl.textContent = comboKey ? `COMBO ×${comboKey + 1}` : '';
+    comboEl.classList.toggle('on', !!comboKey);
+  }
+
   if (game.state !== lastState) {
     lastState = game.state;
     refreshOverlay();

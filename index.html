@@ -94,6 +94,20 @@
       }
       .dialog button:hover { transform: translateY(-2px); box-shadow: 0 0 36px rgba(34, 211, 238, 0.55); }
 
+      /* ---------- 连锁提示 ---------- */
+      #combo {
+        position: fixed;
+        left: 50%; top: 34%;
+        transform: translate(-50%, -50%);
+        font-size: 44px; font-weight: 800; letter-spacing: 0.04em;
+        color: var(--accent);
+        text-shadow: 0 0 30px rgba(34, 211, 238, 0.65);
+        pointer-events: none; opacity: 0;
+        transition: opacity 0.15s;
+        z-index: 5;
+      }
+      #combo.on { opacity: 1; }
+
       /* ---------- 底部按键提示 ---------- */
       #controls {
         position: fixed;
@@ -131,6 +145,7 @@
     </div>
 
     <div id="controls">← → 移动　·　↑ / X 旋转　·　Z 反转　·　↓ 软降　·　空格 硬降　·　P 暂停　·　R 重开</div>
+    <div id="combo"></div>
 
     <script type="module" src="/src/main.js"></script>
   </body>

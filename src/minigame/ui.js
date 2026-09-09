@@ -9,6 +9,18 @@ const TEXT = '#e2e8f0';
 const MUTED = '#7d8bb0';
 const FONT = `"PingFang SC", "Heiti SC", "Microsoft YaHei", sans-serif`;
 
+/** 8 方向 -> NEXT 预览箭头旋转角（canvas y 轴向下，顺时针为正） */
+const CANVAS_ANGLE = {
+  up: 0,
+  ne: Math.PI / 4,
+  right: Math.PI / 2,
+  se: (3 * Math.PI) / 4,
+  down: Math.PI,
+  sw: (-3 * Math.PI) / 4,
+  left: -Math.PI / 2,
+  nw: -Math.PI / 4,
+};
+
 /**
  * 小游戏 UI 层（小霸王手柄布局）：
  *
@@ -48,7 +60,16 @@ export class GameUI {
     this.deckY = 0;
     this.deckH = 0;
 
-    this._cache = { state: '', score: -1, lines: -1, level: -1, next: '', best: -1, pressed: null };
+    this._cache = {
+      state: '',
+      score: -1,
+      lines: -1,
+      level: -1,
+      next: '',
+      best: -1,
+      combo: -1,
+      pressed: null,
+    };
   }
 
   setSide(side) {
@@ -143,7 +164,8 @@ export class GameUI {
       game.lines !== c.lines ||
       game.level !== c.level ||
       game.nextType !== c.next ||
-      best !== c.best
+      best !== c.best ||
+      game.combo !== c.combo
     ) {
       c.state = game.state;
       c.score = game.score;
@@ -151,6 +173,7 @@ export class GameUI {
       c.level = game.level;
       c.next = game.nextType;
       c.best = best;
+      c.combo = game.combo;
       this.dirty = true;
     }
     if (!this.dirty) return false;
@@ -186,6 +209,18 @@ export class GameUI {
     c.clearRect(0, 0, W, H);
 
     this._drawHud(game);
+    // 连锁波次提示
+    if (game.state === 'clearing' && game.combo >= 1) {
+      c.save();
+      c.shadowColor = 'rgba(34, 211, 238, 0.7)';
+      c.shadowBlur = 20;
+      c.fillStyle = ACCENT;
+      c.font = `700 30px ${FONT}`;
+      c.textAlign = 'center';
+      c.fillText(`COMBO ×${game.combo + 1}`, W / 2, H * 0.36);
+      c.restore();
+      c.textAlign = 'left';
+    }
     if (game.state === 'playing' || game.state === 'clearing') {
       this._drawDeck();
     } else {
@@ -262,14 +297,20 @@ export class GameUI {
       const mx = sx + cell / 2;
       const my = sy + cell / 2;
       c.fillStyle = fxHex;
+      c.save();
+      c.translate(mx, my);
+      c.rotate(CANVAS_ANGLE[sp.fx] || 0);
       c.beginPath();
-      if (sp.fx === 'up') {
-        c.moveTo(mx, my - 4); c.lineTo(mx + 3.5, my + 3); c.lineTo(mx - 3.5, my + 3);
-      } else {
-        c.moveTo(mx, my + 4); c.lineTo(mx + 3.5, my - 3); c.lineTo(mx - 3.5, my - 3);
-      }
+      c.moveTo(0, -4.5);
+      c.lineTo(4, 1);
+      c.lineTo(1.6, 1);
+      c.lineTo(1.6, 4.5);
+      c.lineTo(-1.6, 4.5);
+      c.lineTo(-1.6, 1);
+      c.lineTo(-4, 1);
       c.closePath();
       c.fill();
+      c.restore();
     }
     c.textAlign = 'left';
   }
@@ -421,7 +462,7 @@ export class GameUI {
     if (state === 'ready') {
       c.fillText('十字键 ←→ 移动 · ↑ 旋转', W / 2, py + 96);
       c.fillText('↓ 加速 · 连按两下↓ 直接落地', W / 2, py + 118);
-      c.fillText('发光格随消行放激光：↑清上 ↓清下', W / 2, py + 140);
+      c.fillText('发光格 8 向效果：直线清除 · 斜向取反', W / 2, py + 140);
       c.fillText('「选择」键切换左右手布局', W / 2, py + 162);
     } else if (state === 'paused') {
       c.fillText('点击任意处继续', W / 2, py + 116);

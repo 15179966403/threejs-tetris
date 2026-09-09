@@ -198,7 +198,7 @@ export class BoardView {
           if (special && special.r === r && special.c === c) {
             this.activeFx.position.set(wx, wy, 0.5);
             this.activeFx.rotation.z = special.fx === 'down' ? Math.PI : 0;
-            this.activeFx.material = this.fx.materials[special.fx];
+            this.activeFx.material = this.fx.matFor(special.fx);
             this.activeFx.visible = true;
           }
 

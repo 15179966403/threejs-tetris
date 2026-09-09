@@ -8,7 +8,30 @@ import {
   SPECIAL_CHANCE,
   FX_TYPES,
   LASER_CELL_SCORE,
+  MAX_COMBO,
 } from './constants.js';
+
+/** 方向 -> (列增量, 行增量)；行号向下增长，up 即 dy=-1 */
+const FX_DIRS = {
+  up: [0, -1],
+  down: [0, 1],
+  left: [-1, 0],
+  right: [1, 0],
+  ne: [1, -1],
+  nw: [-1, -1],
+  se: [1, 1],
+  sw: [-1, 1],
+};
+
+/** 旋转时特殊格方向的变换（方向随方块一起旋转，玩家旋转即瞄准） */
+const FX_CW = {
+  up: 'right', right: 'down', down: 'left', left: 'up',
+  ne: 'se', se: 'sw', sw: 'nw', nw: 'ne',
+};
+const FX_CCW = {
+  up: 'left', left: 'down', down: 'right', right: 'up',
+  ne: 'nw', nw: 'sw', sw: 'se', se: 'ne',
+};
 
 /** 矩阵顺时针旋转 90° */
 function rotateCW(m) {
@@ -49,6 +72,7 @@ export class TetrisGame {
     this.lines = 0;
     this.level = 1;
     this.state = 'ready'; // ready | playing | clearing | paused | gameover
+    this.combo = 0; // 连锁波次（消行后由特殊格引发的额外消行轮数）
     this.dropTimer = 0;
     this.clearTimer = 0;
     this.clearingRows = [];
@@ -175,11 +199,12 @@ export class TetrisGame {
     return false;
   }
 
-  /** 特殊格坐标随矩阵旋转变换（与 rotateCW/CCW 同步推导） */
+  /** 特殊格坐标与方向随矩阵旋转变换（玩家旋转即瞄准） */
   #rotateSpecial(s, n, dir) {
+    const fx = dir > 0 ? FX_CW[s.fx] : FX_CCW[s.fx];
     return dir > 0
-      ? { r: s.c, c: n - 1 - s.r, fx: s.fx } // 顺时针 (r,c) -> (c, n-1-r)
-      : { r: n - 1 - s.c, c: s.r, fx: s.fx }; // 逆时针 (r,c) -> (n-1-c, r)
+      ? { r: s.c, c: n - 1 - s.r, fx } // 顺时针 (r,c) -> (c, n-1-r)
+      : { r: n - 1 - s.c, c: s.r, fx }; // 逆时针 (r,c) -> (n-1-c, r)
   }
 
   /** 当前方块硬降后所在行 */
@@ -243,7 +268,8 @@ export class TetrisGame {
     }
 
     if (full.length) {
-      // 进入消行状态，视图层会播放闪光动画
+      // 进入消行状态，视图层会播放闪光动画；combo 归零表示连锁波次的起点
+      this.combo = 0;
       this.clearingRows = full;
       this.clearTimer = 0;
       this.state = 'clearing';
@@ -255,9 +281,12 @@ export class TetrisGame {
     }
   }
 
-  /** 消行动画结束，移除行并触发特殊格激光（可连锁），然后生成新方块 */
+  /**
+   * 消行动画结束：触发特殊格效果 → 检测连锁整行 → 下一波或收尾。
+   * 斜向取反可能补全整行，因此消行会级联成 combo 连锁。
+   */
   #finishClear() {
-    // 1. 收集被消除行中的特殊格，换算成消行下移后的列位作为激光起点
+    // 1. 收集被消除行中的特殊格，换算成消行下移后的列位作为效果起点
     const triggers = [];
     for (const r of this.clearingRows) {
       for (let c = 0; c < COLS; c++) {
@@ -275,25 +304,55 @@ export class TetrisGame {
     this.clearingRows = [];
     this.state = 'playing';
 
-    // 3. 依次发射激光（被激光清除的特殊格会连锁入队）
+    // 3. 依次施加方向效果（正交激光清除 / 斜向取反，被清除的特殊格连锁入队）
     let cellsCleared = 0;
     const queue = triggers;
     while (queue.length) {
       const { x, y, fx } = queue.shift();
-      if (fx === 'up') {
-        for (let yy = y - 1; yy >= 0; yy--) cellsCleared += this.#zap(x, yy, queue);
-      } else {
-        for (let yy = y + 1; yy < ROWS; yy++) cellsCleared += this.#zap(x, yy, queue);
+      const [dx, dy] = FX_DIRS[fx];
+      let xx = x + dx;
+      let yy = y + dy;
+      while (xx >= 0 && xx < COLS && yy >= 0 && yy < ROWS) {
+        cellsCleared += this.#applyFx(xx, yy, dx, dy, queue);
+        xx += dx;
+        yy += dy;
       }
     }
     if (cellsCleared) this.score += cellsCleared * LASER_CELL_SCORE * this.level;
 
+    // 4. 连锁检测：效果可能补全整行 → 开启下一波（combo+1，得分倍率 ×(combo+1)）
+    const full = [];
+    for (let r = 0; r < ROWS; r++) if (this.board[r].every((v) => v)) full.push(r);
+    if (full.length && this.combo < MAX_COMBO) {
+      this.combo += 1;
+      this.clearingRows = full;
+      this.clearTimer = 0;
+      this.state = 'clearing'; // 留在 clearing：下一波动画结束后再次进入本方法
+      this.score += LINE_SCORES[full.length] * this.level * (this.combo + 1);
+      this.lines += full.length;
+      this.level = Math.floor(this.lines / 10) + 1;
+      return;
+    }
+
+    // 5. 连锁结束，恢复常规下落
+    this.combo = 0;
     this.#spawn();
   }
 
-  /** 清除单个格子；若其为特殊格则连锁入队，返回是否清除 */
-  #zap(x, y, queue) {
+  /** 对单个格子施加方向效果：正交=清除，斜向=取反；返回清除的格子数 */
+  #applyFx(x, y, dx, dy, queue) {
+    const diagonal = dx !== 0 && dy !== 0;
     const cell = this.board[y][x];
+    if (diagonal) {
+      // 取反：有方块则消除（特殊格连锁入队），空位则生成异形块
+      if (cell) {
+        this.board[y][x] = null;
+        if (cell.fx) queue.push({ x, y, fx: cell.fx });
+        return 1;
+      }
+      this.board[y][x] = { t: 'X', fx: null };
+      return 0;
+    }
     if (!cell) return 0;
     this.board[y][x] = null;
     if (cell.fx) queue.push({ x, y, fx: cell.fx });

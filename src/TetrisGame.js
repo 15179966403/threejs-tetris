@@ -68,12 +68,14 @@ export class TetrisGame {
    *        测试/教学模式可传 0 关闭）
    */
   constructor(options = {}) {
+    this.mode = options.mode || 'skill'; // 'skill' | 'classic'
     this._specialChanceOverride = options.specialChance !== undefined ? options.specialChance : null;
-    this.reset();
+    this.reset(options);
   }
 
-  /** 当前特殊格生成概率：随等级递增，或优先使用显式覆盖设置 */
+  /** 当前特殊格生成概率：随等级递增，或优先使用显式覆盖设置；经典模式恒为 0 */
   get specialChance() {
+    if (this.mode === 'classic') return 0;
     if (this._specialChanceOverride !== null && this._specialChanceOverride !== undefined) {
       return this._specialChanceOverride;
     }
@@ -84,7 +86,11 @@ export class TetrisGame {
     this._specialChanceOverride = val;
   }
 
-  reset() {
+  reset(options = {}) {
+    if (options && options.mode) this.mode = options.mode;
+    if (options && options.specialChance !== undefined) {
+      this._specialChanceOverride = options.specialChance;
+    }
     /** board[row][col]：null 为空，否则为 { t: 方块类型字母, fx: null | 'up' | 'down' } */
     this.board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
     this.score = 0;
@@ -519,8 +525,9 @@ export class TetrisGame {
     return 1;
   }
 
-  /** 触发特殊箭头方块时积攒道具能量 */
+  /** 触发特殊箭头方块时积攒道具能量（经典模式关闭） */
   #addEnergy(amount = 1) {
+    if (this.mode === 'classic') return;
     this.itemEnergy += amount;
     while (this.itemEnergy >= this.requiredEnergy && this.items.length < MAX_ITEMS) {
       this.itemEnergy -= this.requiredEnergy;
@@ -540,14 +547,14 @@ export class TetrisGame {
   }
 
   /**
-   * 使用重力道具
+   * 使用重力道具（经典模式不可用）
    * @param {'rows' | 'cols'} mode 指定连续 2 行还是连续 3 列
    * @param {number} startIdx 起始行号 (0 <= startIdx <= ROWS - 2) 或起始列号 (0 <= startIdx <= COLS - 3)
    * @param {'down' | 'up' | 'left' | 'right'} [dir='down'] 位移方向，默认向下
    * @returns {boolean} 是否成功使用
    */
   useGravity(mode, startIdx, dir = 'down') {
-    if (this.state !== 'playing') return false;
+    if (this.mode === 'classic' || this.state !== 'playing') return false;
     const itemIdx = this.items.findIndex((it) => it.type === 'gravity');
     if (itemIdx === -1) return false;
 

@@ -81,22 +81,58 @@ export class ModalView {
     let swY = py + 160;
 
     if (state === 'ready') {
-      if (best > 0) {
-        c.font = `600 12px ${FONT}`;
+      // 模式双选分段切换 Tab
+      const tabW = Math.floor((pw - 48 - 10) / 2);
+      const tabH = 28;
+      const tabY = py + 74;
+      const isClassic = game.mode === 'classic';
+
+      controlsOut.modeTabs = [
+        { mode: 'skill', x: px + 24, y: tabY, w: tabW, h: tabH },
+        { mode: 'classic', x: px + 24 + tabW + 10, y: tabY, w: tabW, h: tabH },
+      ];
+
+      // 特技模式 Tab
+      drawRoundRect(c, px + 24, tabY, tabW, tabH, 6);
+      c.fillStyle = !isClassic ? 'rgba(34, 211, 238, 0.25)' : 'rgba(20, 28, 55, 0.6)';
+      c.fill();
+      c.strokeStyle = !isClassic ? ACCENT : BORDER;
+      c.lineWidth = !isClassic ? 1.5 : 1;
+      c.stroke();
+      c.font = `600 12px ${FONT}`;
+      c.fillStyle = !isClassic ? ACCENT : '#94a3b8';
+      c.fillText('⚡ 特技模式', px + 24 + tabW / 2, tabY + tabH / 2 + 4);
+
+      // 经典模式 Tab
+      const clX = px + 24 + tabW + 10;
+      drawRoundRect(c, clX, tabY, tabW, tabH, 6);
+      c.fillStyle = isClassic ? 'rgba(34, 211, 238, 0.25)' : 'rgba(20, 28, 55, 0.6)';
+      c.fill();
+      c.strokeStyle = isClassic ? ACCENT : BORDER;
+      c.lineWidth = isClassic ? 1.5 : 1;
+      c.stroke();
+      c.font = `600 12px ${FONT}`;
+      c.fillStyle = isClassic ? ACCENT : '#94a3b8';
+      c.fillText('🧱 经典纯净', clX + tabW / 2, tabY + tabH / 2 + 4);
+
+      // 模式特色介绍与最高分
+      c.font = `11px ${FONT}`;
+      c.fillStyle = '#9fb0d8';
+      if (isClassic) {
+        c.fillText('纯粹方块消除 · 经典速度考验 · 无特殊格', W / 2, py + 120);
+        c.font = `600 11px ${FONT}`;
         c.fillStyle = '#facc15';
-        c.fillText(`🏆 历史最高分  ${best}`, W / 2, py + 86);
-        c.font = `11px ${FONT}`;
-        c.fillStyle = '#9fb0d8';
-        c.fillText('十字键 ←→ 移动 · ↑ 旋转 · ↓ 加速', W / 2, py + 108);
-        c.fillText('连按两下↓ 直接落地 · 发光格 8 向特效', W / 2, py + 128);
+        c.fillText(best > 0 ? `🏆 经典最高纪录  ${best}` : '🏆 经典模式无特殊格与道具', W / 2, py + 138);
       } else {
-        c.fillText('十字键 ←→ 移动 · ↑ 旋转', W / 2, py + 88);
-        c.fillText('↓ 加速 · 连按两下↓ 直接落地', W / 2, py + 110);
-        c.fillText('发光格 8 向效果：直线清除 · 斜向取反', W / 2, py + 132);
+        c.fillText('8向激光穿透 · 重力道具位移 · 刺激连锁', W / 2, py + 120);
+        c.font = `600 11px ${FONT}`;
+        c.fillStyle = '#facc15';
+        c.fillText(best > 0 ? `🏆 特技最高纪录  ${best}` : '🏆 消除箭头方块积攒重力能量', W / 2, py + 138);
       }
       swY = py + 158;
     } else if (state === 'paused') {
-      c.fillText('游戏已暂停', W / 2, py + 92);
+      const modeLabel = game.mode === 'classic' ? '经典纯净模式' : '特技模式';
+      c.fillText(`游戏已暂停 (${modeLabel})`, W / 2, py + 92);
       swY = py + 120;
     } else {
       c.font = `700 22px ${FONT}`;
@@ -104,7 +140,8 @@ export class ModalView {
       c.fillText(`本局得分  ${game.score}`, W / 2, py + 94);
       c.font = `12px ${FONT}`;
       c.fillStyle = '#9fb0d8';
-      c.fillText(`消除 ${game.lines} 行 · 等级 ${game.level}`, W / 2, py + 122);
+      const modeLabel = game.mode === 'classic' ? '经典模式' : '特技模式';
+      c.fillText(`消除 ${game.lines} 行 · 等级 ${game.level} · ${modeLabel}`, W / 2, py + 122);
       c.fillStyle = '#facc15';
       c.fillText(`最高分 ${Math.max(best, game.score)}`, W / 2, py + 144);
       swY = py + 164;

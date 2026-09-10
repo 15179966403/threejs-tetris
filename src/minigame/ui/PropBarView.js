@@ -11,6 +11,19 @@ export class PropBarView {
 
     drawPanel(c, p.x, p.y, p.w, p.h, 12);
 
+    if (game && game.mode === 'classic') {
+      // 经典纯净模式：展示专属经典勋章，不展示能量槽与道具
+      c.textAlign = 'center';
+      c.font = `700 12px ${FONT}`;
+      c.fillStyle = '#38bdf8';
+      c.fillText('CLASSIC', p.x + p.w / 2, p.y + p.h / 2 - 6);
+      c.font = `600 9px ${FONT}`;
+      c.fillStyle = '#94a3b8';
+      c.fillText('🧱 纯净竞技', p.x + p.w / 2, p.y + p.h / 2 + 12);
+      c.textAlign = 'left';
+      return;
+    }
+
     // 顶部：能量条
     const curEnergy = game ? (game.itemEnergy || 0) : 0;
     const reqEnergy = game ? (game.requiredEnergy || 3) : 3;

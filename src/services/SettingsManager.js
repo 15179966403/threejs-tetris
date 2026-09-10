@@ -11,6 +11,7 @@ const LEGACY_SIDE_KEY = 'tetris3d_dpad_side';
 
 const DEFAULT_SETTINGS = {
   controlMode: 'dual', // 'dual' | 'left' | 'right'
+  gameMode: 'skill', // 'skill' | 'classic'
   vibrateEnabled: true,
   sfxEnabled: true,
   bgmEnabled: true,
@@ -22,6 +23,7 @@ export class SettingsManager {
   constructor() {
     this._listeners = new Set();
     this._settings = { ...DEFAULT_SETTINGS };
+    this._memBest = {};
     this._load();
   }
 
@@ -105,11 +107,77 @@ export class SettingsManager {
     return this.get(key);
   }
 
+  /** 获取对应模式历史最高分 */
+  getBest(mode = 'skill') {
+    const key = mode === 'classic' ? 'tetris3d_best_classic' : 'tetris3d_best_skill';
+    try {
+      if (mode === 'classic') {
+        if (typeof wx !== 'undefined' && wx.getStorageSync) {
+          const v = wx.getStorageSync('tetris3d_best_classic');
+          if (v !== undefined && v !== '') return v | 0;
+        } else if (typeof localStorage !== 'undefined') {
+          const v = localStorage.getItem('tetris3d_best_classic');
+          if (v !== null) return v | 0;
+        }
+      } else {
+        if (typeof wx !== 'undefined' && wx.getStorageSync) {
+          const s = wx.getStorageSync('tetris3d_best_skill');
+          if (s !== undefined && s !== '') return s | 0;
+          const legacy = wx.getStorageSync('tetris3d_best');
+          if (legacy !== undefined && legacy !== '') return legacy | 0;
+        } else if (typeof localStorage !== 'undefined') {
+          const s = localStorage.getItem('tetris3d_best_skill');
+          if (s !== null) return s | 0;
+          const legacy = localStorage.getItem('tetris3d_best');
+          if (legacy !== null) return legacy | 0;
+        }
+      }
+    } catch (e) {
+      // 忽略
+    }
+    return (this._memBest && this._memBest[key]) || 0;
+  }
+
+  /** 更新对应模式历史最高分 */
+  setBest(mode = 'skill', score = 0) {
+    const key = mode === 'classic' ? 'tetris3d_best_classic' : 'tetris3d_best_skill';
+    if (!this._memBest) this._memBest = {};
+    this._memBest[key] = score;
+
+    try {
+      if (mode === 'classic') {
+        if (typeof wx !== 'undefined' && wx.setStorageSync) {
+          wx.setStorageSync('tetris3d_best_classic', score);
+        } else if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('tetris3d_best_classic', String(score));
+        }
+      } else {
+        if (typeof wx !== 'undefined' && wx.setStorageSync) {
+          wx.setStorageSync('tetris3d_best_skill', score);
+          wx.setStorageSync('tetris3d_best', score);
+        } else if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('tetris3d_best_skill', String(score));
+          localStorage.setItem('tetris3d_best', String(score));
+        }
+      }
+    } catch (e) {
+      // 忽略
+    }
+  }
+
   /** 循环切换手柄操作模式：dual -> left -> right -> dual */
   cycleControlMode() {
     const cur = this.get('controlMode');
     const next = cur === 'dual' ? 'left' : cur === 'left' ? 'right' : 'dual';
     this.set('controlMode', next);
+    return next;
+  }
+
+  /** 切换游戏模式：skill <-> classic */
+  cycleGameMode() {
+    const cur = this.get('gameMode');
+    const next = cur === 'classic' ? 'skill' : 'classic';
+    this.set('gameMode', next);
     return next;
   }
 

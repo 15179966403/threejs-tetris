@@ -92,7 +92,8 @@ scene.add(rimLight);
 /* ================= 游戏与视图 ================= */
 
 const view = new BoardView(scene);
-const game = new TetrisGame();
+const initialGameMode = settingsManager.get('gameMode') || 'skill';
+const game = new TetrisGame({ mode: initialGameMode });
 
 /* ================= UI 叠加层（正交相机 + CanvasTexture 全屏面片） ================= */
  
@@ -152,10 +153,7 @@ wx.onWindowResize &&
  
 /* ================= 最高分持久化 ================= */
  
-let best = 0;
-try {
-  best = wx.getStorageSync('tetris3d_best') | 0;
-} catch (e) { /* 忽略存储异常 */ }
+let best = settingsManager.getBest(initialGameMode);
  
 /* ================= 动作封装（带状态闸门） ================= */
  
@@ -195,6 +193,14 @@ const actions = {
     vibrate('light');
     audioService.playUiClick();
   },
+  setGameMode: (mode) => {
+    if (game.mode === mode) return;
+    settingsManager.set('gameMode', mode);
+    best = settingsManager.getBest(mode);
+    game.reset({ mode });
+    audioService.playUiClick();
+    ui.dirty = true;
+  },
   openSettings: () => {
     ui.openSettings();
     audioService.playUiClick();
@@ -219,7 +225,9 @@ const actions = {
     ui.dirty = true;
   },
   returnHome: () => {
-    game.reset();
+    const mode = settingsManager.get('gameMode') || 'skill';
+    game.reset({ mode });
+    best = settingsManager.getBest(mode);
     sceneManager.setScene(SCENES.TITLE);
     audioService.playUiClick();
     ui.dirty = true;
@@ -339,9 +347,7 @@ function tick() {
       audioService.playGameOver();
       if (game.score > best) {
         best = game.score;
-        try {
-          wx.setStorageSync('tetris3d_best', best);
-        } catch (e) { /* 忽略 */ }
+        settingsManager.setBest(game.mode, best);
       }
     }
     prevState = game.state;

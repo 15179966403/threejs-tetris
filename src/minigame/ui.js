@@ -231,6 +231,11 @@ export class GameUI {
     // 3. 浮层非游戏状态
     if (inR(c.btnSettings)) return 'btnSettings';
     if (inR(c.btnHome)) return 'btnHome';
+    if (c.modeTabs) {
+      for (let i = 0; i < c.modeTabs.length; i++) {
+        if (inR(c.modeTabs[i])) return 'mode_' + c.modeTabs[i].mode;
+      }
+    }
     if (inR(c.swapOverlay)) return 'swapOverlay';
     if (inR(c.swapTop)) return 'swapTop';
     if (inR(c.primary)) return 'primary';

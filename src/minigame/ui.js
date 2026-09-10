@@ -82,6 +82,9 @@ export class GameUI {
       tgtIdx: -1,
       tgtMode: '',
       settingsOpen: false,
+      vibrateEnabled: null,
+      sfxEnabled: null,
+      controlMode: '',
     };
   }
 
@@ -286,6 +289,10 @@ export class GameUI {
     const tgtIdx = this.targeting ? this.targeting.startIdx : -1;
     const tgtMode = this.targeting ? this.targeting.mode : '';
     const settingsOpen = this.modalView.isSettingsOpen;
+    const curSettings = settings || (settingsManager ? settingsManager.getAll() : null);
+    const vibeOn = curSettings ? curSettings.vibrateEnabled !== false : true;
+    const sfxOn = curSettings ? curSettings.sfxEnabled !== false : true;
+    const ctrlMode = curSettings ? curSettings.controlMode : this.side;
 
     if (
       game.state !== c.state ||
@@ -300,7 +307,10 @@ export class GameUI {
       tgtActive !== c.tgtActive ||
       tgtIdx !== c.tgtIdx ||
       tgtMode !== c.tgtMode ||
-      settingsOpen !== c.settingsOpen
+      settingsOpen !== c.settingsOpen ||
+      vibeOn !== c.vibrateEnabled ||
+      sfxOn !== c.sfxEnabled ||
+      ctrlMode !== c.controlMode
     ) {
       c.state = game.state;
       c.score = game.score;
@@ -315,10 +325,13 @@ export class GameUI {
       c.tgtIdx = tgtIdx;
       c.tgtMode = tgtMode;
       c.settingsOpen = settingsOpen;
+      c.vibrateEnabled = vibeOn;
+      c.sfxEnabled = sfxOn;
+      c.controlMode = ctrlMode;
       this.dirty = true;
     }
     if (!this.dirty) return false;
-    this._draw(game, best, settings);
+    this._draw(game, best, curSettings);
     this.dirty = false;
     return true;
   }

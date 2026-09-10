@@ -106,6 +106,7 @@ settingsManager.subscribe((settings) => {
   if (settings.controlMode && settings.controlMode !== ui.side) {
     ui.setSide(settings.controlMode);
   }
+  ui.dirty = true;
 });
  
 const uiScene = new THREE.Scene();
@@ -224,11 +225,13 @@ const actions = {
     settingsManager.set('controlMode', mode);
     vibrate('light');
     audioService.playUiClick();
+    ui.dirty = true;
   },
   toggleVibrate: () => {
     settingsManager.toggle('vibrateEnabled');
     vibrate('light');
     audioService.playUiClick();
+    ui.dirty = true;
   },
   toggleSfx: () => {
     settingsManager.toggle('sfxEnabled');
@@ -402,7 +405,7 @@ function tick() {
   }
 
   // UI 有变化才重绘并上传纹理
-  if (ui.update(game, best)) ui.texture.needsUpdate = true;
+  if (ui.update(game, best, settingsManager.getAll())) ui.texture.needsUpdate = true;
 
   renderer.render(scene, camera); // scene.background 会自动清屏
   renderer.clearDepth();

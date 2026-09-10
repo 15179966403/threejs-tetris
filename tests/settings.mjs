@@ -52,4 +52,25 @@ describe('SettingsManager 单元测试', () => {
     mgr.set('controlMode', 'left');
     assert.equal(notified, null, '退订后不应再收到通知');
   });
+
+  it('独立翻转 vibrateEnabled 与 sfxEnabled 互不干扰', () => {
+    const mgr = new SettingsManager();
+    assert.equal(mgr.get('vibrateEnabled'), true);
+    assert.equal(mgr.get('sfxEnabled'), true);
+
+    // 仅关闭震动
+    mgr.toggle('vibrateEnabled');
+    assert.equal(mgr.get('vibrateEnabled'), false, '震效应为已关闭');
+    assert.equal(mgr.get('sfxEnabled'), true, '音效应仍保持开启');
+
+    // 仅关闭音效
+    mgr.toggle('sfxEnabled');
+    assert.equal(mgr.get('vibrateEnabled'), false, '震效应仍保持关闭');
+    assert.equal(mgr.get('sfxEnabled'), false, '音效应为已关闭');
+
+    // 仅开启震动
+    mgr.toggle('vibrateEnabled');
+    assert.equal(mgr.get('vibrateEnabled'), true, '震效应重新开启');
+    assert.equal(mgr.get('sfxEnabled'), false, '音效应保持关闭');
+  });
 });

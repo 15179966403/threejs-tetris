@@ -471,7 +471,7 @@ export class ModalView {
     const toggleBtnW = 88;
     const toggleBtnH = 28;
     const toggleBtnX = px + pw - 24 - toggleBtnW;
-    controlsOut.settingVibe = { x: toggleBtnX, y: vibeY, w: toggleBtnW, h: toggleBtnH };
+    controlsOut.settingVibe = { x: px + 16, y: vibeY - 4, w: pw - 32, h: toggleBtnH + 8 };
 
     const vibeOn = settings ? settings.vibrateEnabled !== false : true;
     drawRoundRect(c, toggleBtnX, vibeY, toggleBtnW, toggleBtnH, toggleBtnH / 2);
@@ -502,7 +502,7 @@ export class ModalView {
     c.shadowBlur = 0;
     c.fillText('音效声音反馈', px + 24, sfxY + 14);
 
-    controlsOut.settingSfx = { x: toggleBtnX, y: sfxY, w: toggleBtnW, h: toggleBtnH };
+    controlsOut.settingSfx = { x: px + 16, y: sfxY - 4, w: pw - 32, h: toggleBtnH + 8 };
 
     const sfxOn = settings ? settings.sfxEnabled !== false : true;
     drawRoundRect(c, toggleBtnX, sfxY, toggleBtnW, toggleBtnH, toggleBtnH / 2);

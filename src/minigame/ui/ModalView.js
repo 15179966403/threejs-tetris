@@ -57,50 +57,48 @@ export class ModalView {
       c.strokeStyle = 'rgba(34, 211, 238, 0.28)';
       c.lineWidth = 1;
       c.beginPath();
-      c.moveTo(px + 28, py + 42);
-      c.lineTo(W / 2 - 86, py + 42);
-      c.moveTo(W / 2 + 86, py + 42);
-      c.lineTo(px + pw - 28, py + 42);
+      c.moveTo(px + 28, py + 36);
+      c.lineTo(W / 2 - 82, py + 36);
+      c.moveTo(W / 2 + 82, py + 36);
+      c.lineTo(px + pw - 28, py + 36);
       c.stroke();
 
       // 小科技棱形点
       c.fillStyle = ACCENT_CYAN;
       c.beginPath();
-      c.arc(W / 2 - 86, py + 42, 2, 0, Math.PI * 2);
-      c.arc(W / 2 + 86, py + 42, 2, 0, Math.PI * 2);
+      c.arc(W / 2 - 82, py + 36, 2, 0, Math.PI * 2);
+      c.arc(W / 2 + 82, py + 36, 2, 0, Math.PI * 2);
       c.fill();
 
-      // 主标题
-      c.shadowColor = 'rgba(0, 242, 254, 0.65)';
-      c.shadowBlur = 18;
-      c.fillStyle = '#ffffff';
-      c.font = `700 30px ${FONT}`;
-      c.fillText('3D TETRIS', W / 2, py + 49);
+      // 主标题（纯白清晰无阴影）
       c.shadowBlur = 0;
+      c.fillStyle = '#ffffff';
+      c.font = `bold 24px ${FONT}`;
+      c.textBaseline = 'middle';
+      c.fillText('3D TETRIS', W / 2, py + 36);
 
       // 副标题微字
-      c.font = `700 9px ${FONT}`;
+      c.font = `bold 10px ${FONT}`;
       c.fillStyle = '#94a3b8';
-      c.fillText('CYBERNETIC EDITION · 立体方块', W / 2, py + 62);
+      c.textBaseline = 'middle';
+      c.fillText('CYBERNETIC EDITION · 立体方块', W / 2, py + 54);
     } else if (state === 'paused') {
-      c.shadowColor = 'rgba(56, 189, 248, 0.6)';
-      c.shadowBlur = 16;
+      c.shadowBlur = 0;
       c.fillStyle = '#38bdf8';
-      c.font = `700 28px ${FONT}`;
-      c.fillText('⏸ PAUSED', W / 2, py + 52);
-      c.shadowBlur = 0;
+      c.font = `bold 24px ${FONT}`;
+      c.textBaseline = 'middle';
+      c.fillText('⏸ PAUSED', W / 2, py + 42);
     } else {
-      c.shadowColor = 'rgba(248, 113, 113, 0.65)';
-      c.shadowBlur = 20;
-      c.fillStyle = '#f87171';
-      c.font = `700 28px ${FONT}`;
-      c.fillText('GAME OVER', W / 2, py + 52);
       c.shadowBlur = 0;
+      c.fillStyle = '#f87171';
+      c.font = `bold 24px ${FONT}`;
+      c.textBaseline = 'middle';
+      c.fillText('GAME OVER', W / 2, py + 42);
     }
 
     // 右上角辅助胶囊按键（首页显示设置，暂停/结算显示返回首页）
     if (state === 'ready') {
-      const setW = 76;
+      const setW = 68;
       const setH = 26;
       const setX = px + pw - setW - 14;
       const setY = py + 14;
@@ -116,16 +114,14 @@ export class ModalView {
       c.stroke();
       c.shadowBlur = 0;
 
-      c.font = `700 12px ${FONT}`;
+      c.font = `bold 12px ${FONT}`;
       c.fillStyle = '#ffffff';
       c.textAlign = 'center';
       c.textBaseline = 'middle';
-      c.shadowColor = 'rgba(0, 0, 0, 0.85)';
-      c.shadowBlur = 4;
-      c.fillText('设 置', setX + setW / 2, setY + setH / 2);
       c.shadowBlur = 0;
+      c.fillText('设置', setX + setW / 2, setY + setH / 2);
     } else {
-      const homeW = 76;
+      const homeW = 68;
       const homeH = 26;
       const homeX = px + pw - homeW - 14;
       const homeY = py + 14;
@@ -141,14 +137,12 @@ export class ModalView {
       c.stroke();
       c.shadowBlur = 0;
 
-      c.font = `700 12px ${FONT}`;
+      c.font = `bold 12px ${FONT}`;
       c.fillStyle = '#ffffff';
       c.textAlign = 'center';
       c.textBaseline = 'middle';
-      c.shadowColor = 'rgba(0, 0, 0, 0.85)';
-      c.shadowBlur = 4;
-      c.fillText('首 页', homeX + homeW / 2, homeY + homeH / 2);
       c.shadowBlur = 0;
+      c.fillText('首页', homeX + homeW / 2, homeY + homeH / 2);
     }
 
     c.textBaseline = 'alphabetic';
@@ -179,7 +173,7 @@ export class ModalView {
         c.shadowBlur = 6;
         c.stroke();
         c.shadowBlur = 0;
-        c.font = `700 12px ${FONT}`;
+        c.font = `bold 12px ${FONT}`;
         c.fillStyle = '#ffffff';
       } else {
         c.fillStyle = 'rgba(15, 22, 48, 0.75)';
@@ -187,7 +181,7 @@ export class ModalView {
         c.strokeStyle = 'rgba(120, 140, 255, 0.35)';
         c.lineWidth = 1;
         c.stroke();
-        c.font = `700 12px ${FONT}`;
+        c.font = `bold 12px ${FONT}`;
         c.fillStyle = '#cbd5e1';
       }
       c.textAlign = 'center';
@@ -206,7 +200,7 @@ export class ModalView {
         c.shadowBlur = 6;
         c.stroke();
         c.shadowBlur = 0;
-        c.font = `700 12px ${FONT}`;
+        c.font = `bold 12px ${FONT}`;
         c.fillStyle = '#ffffff';
       } else {
         c.fillStyle = 'rgba(15, 22, 48, 0.75)';
@@ -214,7 +208,7 @@ export class ModalView {
         c.strokeStyle = 'rgba(120, 140, 255, 0.35)';
         c.lineWidth = 1;
         c.stroke();
-        c.font = `700 12px ${FONT}`;
+        c.font = `bold 12px ${FONT}`;
         c.fillStyle = '#cbd5e1';
       }
       c.textAlign = 'center';
@@ -224,16 +218,16 @@ export class ModalView {
       c.textBaseline = 'alphabetic';
 
       // 模式特色介绍与最高分
-      c.font = `500 11px ${FONT}`;
+      c.font = `11px ${FONT}`;
       c.fillStyle = '#cbd5e1';
       if (isClassic) {
         c.fillText('纯粹方块消除 · 经典速度考验 · 无特殊格', W / 2, py + 120);
-        c.font = `700 11px ${FONT}`;
+        c.font = `bold 11px ${FONT}`;
         c.fillStyle = '#facc15';
         c.fillText(best > 0 ? `经典最高纪录  ${best}` : '纯粹竞技 · 冲击个人极限', W / 2, py + 138);
       } else {
         c.fillText('8向激光穿透 · 重力道具位移 · 刺激连锁', W / 2, py + 120);
-        c.font = `700 11px ${FONT}`;
+        c.font = `bold 11px ${FONT}`;
         c.fillStyle = '#facc15';
         c.fillText(best > 0 ? `特技最高纪录  ${best}` : '消除箭头方块积攒重力能量', W / 2, py + 138);
       }
@@ -241,29 +235,27 @@ export class ModalView {
     } else if (state === 'paused') {
       c.textBaseline = 'alphabetic';
       const modeLabel = game.mode === 'classic' ? '经典纯净模式' : '特技模式';
-      c.font = `700 13px ${FONT}`;
+      c.font = `bold 13px ${FONT}`;
       c.fillStyle = '#f1f5f9';
       c.fillText(`游戏已暂停 · ${modeLabel}`, W / 2, py + 86);
-      c.font = `500 11px ${FONT}`;
+      c.font = `11px ${FONT}`;
       c.fillStyle = '#94a3b8';
       c.fillText(`当前得分  ${game.score}   |   消除行数  ${game.lines}`, W / 2, py + 104);
       swY = py + 120;
     } else {
       c.textBaseline = 'alphabetic';
-      c.font = `700 24px ${FONT}`;
+      c.font = `bold 24px ${FONT}`;
       c.fillStyle = '#00f2fe';
-      c.shadowColor = '#00f2fe';
-      c.shadowBlur = 10;
-      c.fillText(`本局得分  ${game.score}`, W / 2, py + 92);
       c.shadowBlur = 0;
+      c.fillText(`本局得分  ${game.score}`, W / 2, py + 92);
 
-      c.font = `600 12px ${FONT}`;
+      c.font = `12px ${FONT}`;
       c.fillStyle = '#cbd5e1';
       const modeLabel = game.mode === 'classic' ? '经典模式' : '特技模式';
       c.fillText(`消除 ${game.lines} 行  ·  等级 ${game.level}  ·  ${modeLabel}`, W / 2, py + 118);
 
       c.fillStyle = '#facc15';
-      c.font = `700 12px ${FONT}`;
+      c.font = `bold 12px ${FONT}`;
       c.fillText(`历史最高纪录  ${Math.max(best, game.score)}`, W / 2, py + 142);
       swY = py + 164;
     }
@@ -297,14 +289,12 @@ export class ModalView {
       c.lineWidth = 1;
       c.stroke();
 
-      c.font = `700 13px ${FONT}`;
+      c.font = `bold 13px ${FONT}`;
       c.fillStyle = '#ffffff';
       c.textAlign = 'center';
       c.textBaseline = 'middle';
-      c.shadowColor = 'rgba(0, 0, 0, 0.7)';
-      c.shadowBlur = 4;
-      c.fillText('分享战绩给好友', swX + swW / 2, swY + swH / 2);
       c.shadowBlur = 0;
+      c.fillText('分享战绩给好友', swX + swW / 2, swY + swH / 2);
     } else {
       // 模式切换快捷按键（ready / paused 状态保持原样）
       controlsOut.swapOverlay = { x: swX, y: swY, w: swW, h: swH };
@@ -328,20 +318,18 @@ export class ModalView {
       c.lineWidth = 1;
       c.stroke();
 
-      c.font = `700 12px ${FONT}`;
+      c.font = `bold 12px ${FONT}`;
       c.fillStyle = '#ffffff';
       c.textAlign = 'center';
       c.textBaseline = 'middle';
-      c.shadowColor = 'rgba(0, 0, 0, 0.85)';
-      c.shadowBlur = 4;
+      c.shadowBlur = 0;
       const modeText =
         side === 'dual'
-          ? '操作布局：双手 (点击切换)'
+          ? '操作模式：双手 (点击切换)'
           : side === 'right'
-            ? '操作布局：右手 (点击切换)'
-            : '操作布局：左手 (点击切换)';
+            ? '操作模式：右手 (点击切换)'
+            : '操作模式：左手 (点击切换)';
       c.fillText(modeText, swX + swW / 2, swY + swH / 2);
-      c.shadowBlur = 0;
     }
 
     // 主操作按钮（深邃科技蓝渐变 + 霓虹青边框 + 纯白高对比立体文字，绝对醒目清晰）
@@ -377,22 +365,21 @@ export class ModalView {
     c.lineWidth = 1;
     c.stroke();
 
-    // 纯白清晰文字（带柔和阴影，确保在任何屏幕上都100%清晰突出）
+    // 纯白清晰文字（确保在任何屏幕上都100%清晰突出）
     c.fillStyle = '#ffffff';
-    c.font = `700 16px ${FONT}`;
+    c.font = `bold 16px ${FONT}`;
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.shadowColor = 'rgba(0, 0, 0, 0.85)';
-    c.shadowBlur = 4;
+    c.shadowBlur = 0;
     const primaryLabel = state === 'ready' ? '开始游戏' : state === 'paused' ? '继续游戏' : '再来一局';
     c.fillText(primaryLabel, bx + bw / 2, by + bh / 2);
-    c.shadowBlur = 0;
 
     c.textBaseline = 'alphabetic';
 
     // 适龄提示规范：CADPA 8+ 标志（首屏合规要求）
     if (state === 'ready') {
-      c.font = `600 9px ${FONT}`;
+      c.shadowBlur = 0;
+      c.font = `9px ${FONT}`;
       c.fillStyle = '#64748b';
       c.textAlign = 'center';
       c.textBaseline = 'middle';
@@ -414,22 +401,23 @@ export class ModalView {
     drawTechCorners(c, px, py, pw, ph, 7, 'rgba(34, 211, 238, 0.55)');
 
     c.textAlign = 'center';
-    c.shadowColor = 'rgba(0, 242, 254, 0.55)';
-    c.shadowBlur = 14;
-    c.fillStyle = '#ffffff';
-    c.font = `700 22px ${FONT}`;
-    c.fillText('游戏设置', W / 2, py + 38);
     c.shadowBlur = 0;
+    c.fillStyle = '#ffffff';
+    c.font = `bold 20px ${FONT}`;
+    c.textBaseline = 'middle';
+    c.fillText('游戏设置', W / 2, py + 36);
 
     // 1. 操作模式分段选择器
-    c.font = `700 12px ${FONT}`;
+    c.font = `bold 12px ${FONT}`;
     c.fillStyle = '#cbd5e1';
     c.textAlign = 'left';
+    c.textBaseline = 'middle';
+    c.shadowBlur = 0;
     c.fillText('操作布局模式', px + 24, py + 68);
 
     const segW = Math.floor((pw - 48 - 16) / 3);
     const segH = 32;
-    const segY = py + 78;
+    const segY = py + 80;
 
     const modes = [
       { key: 'dual', label: '双手持握', x: px + 24 },
@@ -463,23 +451,22 @@ export class ModalView {
         c.stroke();
       }
 
-      c.font = `700 11px ${FONT}`;
+      c.font = `bold 12px ${FONT}`;
       c.fillStyle = active ? '#ffffff' : '#cbd5e1';
       c.textAlign = 'center';
       c.textBaseline = 'middle';
-      c.shadowColor = 'rgba(0, 0, 0, 0.85)';
-      c.shadowBlur = 4;
-      c.fillText(m.label, m.x + segW / 2, segY + segH / 2);
       c.shadowBlur = 0;
+      c.fillText(m.label, m.x + segW / 2, segY + segH / 2);
     }
 
     // 2. 触感震动反馈开关
-    const vibeY = py + 126;
-    c.textBaseline = 'alphabetic';
+    const vibeY = py + 128;
     c.textAlign = 'left';
-    c.font = `700 12px ${FONT}`;
+    c.textBaseline = 'middle';
+    c.font = `bold 12px ${FONT}`;
     c.fillStyle = '#cbd5e1';
-    c.fillText('触感震动反馈', px + 24, vibeY + 18);
+    c.shadowBlur = 0;
+    c.fillText('触感震动反馈', px + 24, vibeY + 14);
 
     const toggleBtnW = 88;
     const toggleBtnH = 28;
@@ -499,22 +486,21 @@ export class ModalView {
     c.stroke();
     c.shadowBlur = 0;
 
-    c.font = `700 12px ${FONT}`;
+    c.font = `bold 12px ${FONT}`;
     c.fillStyle = vibeOn ? '#ffffff' : '#94a3b8';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.shadowColor = 'rgba(0, 0, 0, 0.85)';
-    c.shadowBlur = 4;
-    c.fillText(vibeOn ? '已开启' : '已关闭', toggleBtnX + toggleBtnW / 2, vibeY + toggleBtnH / 2);
     c.shadowBlur = 0;
+    c.fillText(vibeOn ? '已开启' : '已关闭', toggleBtnX + toggleBtnW / 2, vibeY + toggleBtnH / 2);
 
     // 3. 音效声音反馈开关
-    const sfxY = py + 168;
-    c.textBaseline = 'alphabetic';
+    const sfxY = py + 170;
     c.textAlign = 'left';
-    c.font = `700 12px ${FONT}`;
+    c.textBaseline = 'middle';
+    c.font = `bold 12px ${FONT}`;
     c.fillStyle = '#cbd5e1';
-    c.fillText('音效声音反馈', px + 24, sfxY + 18);
+    c.shadowBlur = 0;
+    c.fillText('音效声音反馈', px + 24, sfxY + 14);
 
     controlsOut.settingSfx = { x: toggleBtnX, y: sfxY, w: toggleBtnW, h: toggleBtnH };
 
@@ -531,14 +517,12 @@ export class ModalView {
     c.stroke();
     c.shadowBlur = 0;
 
-    c.font = `700 12px ${FONT}`;
+    c.font = `bold 12px ${FONT}`;
     c.fillStyle = sfxOn ? '#ffffff' : '#94a3b8';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.shadowColor = 'rgba(0, 0, 0, 0.85)';
-    c.shadowBlur = 4;
-    c.fillText(sfxOn ? '已开启' : '已静音', toggleBtnX + toggleBtnW / 2, sfxY + toggleBtnH / 2);
     c.shadowBlur = 0;
+    c.fillText(sfxOn ? '已开启' : '已静音', toggleBtnX + toggleBtnW / 2, sfxY + toggleBtnH / 2);
 
     // 4. 关闭/确定按钮
     const okW = 160;
@@ -572,13 +556,11 @@ export class ModalView {
     c.stroke();
 
     c.fillStyle = '#ffffff';
-    c.font = `700 15px ${FONT}`;
+    c.font = `bold 15px ${FONT}`;
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.shadowColor = 'rgba(0, 0, 0, 0.85)';
-    c.shadowBlur = 4;
-    c.fillText('确 定', okX + okW / 2, okY + okH / 2);
     c.shadowBlur = 0;
+    c.fillText('确 定', okX + okW / 2, okY + okH / 2);
     c.textBaseline = 'alphabetic';
   }
 }

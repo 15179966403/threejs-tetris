@@ -8,6 +8,7 @@ import { COLS, ROWS } from '../constants.js';
 import { settingsManager } from '../services/SettingsManager.js';
 import { audioService } from '../services/AudioService.js';
 import { sceneManager, SCENES } from '../services/SceneManager.js';
+import { privacyManager } from '../services/PrivacyManager.js';
 
 /* global wx */
 
@@ -201,6 +202,16 @@ const actions = {
     audioService.playUiClick();
     ui.dirty = true;
   },
+  share: () => {
+    vibrate('light');
+    audioService.playUiClick();
+    try {
+      if (typeof wx !== 'undefined' && wx.shareAppMessage) {
+        wx.shareAppMessage(getShareData());
+      }
+    } catch (e) { /* 环境降级 */ }
+    ui.dirty = true;
+  },
   openSettings: () => {
     ui.openSettings();
     audioService.playUiClick();
@@ -276,6 +287,43 @@ function vibrate(type) {
     wx.vibrateShort({ type });
   } catch (e) { /* 老基础库无 type 参数等情况 */ }
 }
+
+/* ================= 社交分享与合规隐私 ================= */
+
+function getShareData() {
+  const modeName = game.mode === 'classic' ? '经典纯净' : '特技重力';
+  const score = game.score || 0;
+  return {
+    title: score > 0
+      ? `我在 3D 俄罗斯方块【${modeName}】斩获 ${score} 分！快来挑战！`
+      : '超解压的 3D 俄罗斯方块，重力特技带你飞！',
+    query: `mode=${game.mode || 'skill'}`,
+  };
+}
+
+// 初始化隐私保护合规监听
+privacyManager.init();
+
+// 初始化右上角胶囊分享菜单
+try {
+  if (typeof wx !== 'undefined') {
+    if (wx.showShareMenu) {
+      wx.showShareMenu({
+        withShareTicket: true,
+        menus: ['shareAppMessage', 'shareTimeline'],
+      });
+    }
+    if (wx.onShareAppMessage) {
+      wx.onShareAppMessage(() => getShareData());
+    }
+    if (wx.onShareTimeline) {
+      wx.onShareTimeline(() => {
+        const d = getShareData();
+        return { title: d.title, query: d.query };
+      });
+    }
+  }
+} catch (e) { /* 环境降级 */ }
 
 /* ================= 生命周期：切后台自动暂停 ================= */
 

@@ -147,29 +147,50 @@ export class ModalView {
       swY = py + 164;
     }
 
-    // 模式切换快捷按键（与原版位置完全一致，保证自动化测试与手感兼容）
+    // 模式切换快捷按键与分享按钮尺寸基准
     const swW = 200;
     const swH = 34;
     const swX = px + (pw - swW) / 2;
-    controlsOut.swapOverlay = { x: swX, y: swY, w: swW, h: swH };
 
-    c.fillStyle = 'rgba(20, 28, 58, 0.85)';
-    c.strokeStyle = 'rgba(120, 140, 255, 0.45)';
-    c.lineWidth = 1;
-    drawRoundRect(c, swX, swY, swW, swH, swH / 2);
-    c.fill();
-    c.stroke();
+    if (state === 'gameover') {
+      // 结算状态：一键分享战绩给微信好友/群
+      controlsOut.btnShare = { x: swX, y: swY, w: swW, h: swH };
+      const sGrad = c.createLinearGradient(swX, swY, swX + swW, swY + swH);
+      sGrad.addColorStop(0, '#10b981');
+      sGrad.addColorStop(1, '#06b6d4');
+      drawRoundRect(c, swX, swY, swW, swH, swH / 2);
+      c.fillStyle = sGrad;
+      c.fill();
+      c.strokeStyle = '#34d399';
+      c.lineWidth = 1;
+      c.stroke();
 
-    c.font = `500 12px ${FONT}`;
-    c.fillStyle = '#c5d1ec';
-    c.textAlign = 'center';
-    const modeText =
-      side === 'dual'
-        ? '👐 操作模式：双手 (点击切换)'
-        : side === 'right'
-          ? '👉 操作模式：右手 (点击切换)'
-          : '👈 操作模式：左手 (点击切换)';
-    c.fillText(modeText, swX + swW / 2, swY + swH / 2 + 4);
+      c.font = `700 13px ${FONT}`;
+      c.fillStyle = '#04101a';
+      c.textAlign = 'center';
+      c.fillText('📤 分享战绩给好友', swX + swW / 2, swY + swH / 2 + 4.5);
+    } else {
+      // 模式切换快捷按键（ready / paused 状态保持原样）
+      controlsOut.swapOverlay = { x: swX, y: swY, w: swW, h: swH };
+
+      c.fillStyle = 'rgba(20, 28, 58, 0.85)';
+      c.strokeStyle = 'rgba(120, 140, 255, 0.45)';
+      c.lineWidth = 1;
+      drawRoundRect(c, swX, swY, swW, swH, swH / 2);
+      c.fill();
+      c.stroke();
+
+      c.font = `500 12px ${FONT}`;
+      c.fillStyle = '#c5d1ec';
+      c.textAlign = 'center';
+      const modeText =
+        side === 'dual'
+          ? '👐 操作模式：双手 (点击切换)'
+          : side === 'right'
+            ? '👉 操作模式：右手 (点击切换)'
+            : '👈 操作模式：左手 (点击切换)';
+      c.fillText(modeText, swX + swW / 2, swY + swH / 2 + 4);
+    }
 
     // 主操作按钮（与原版位置完全一致）
     const bw = 184;
@@ -191,6 +212,14 @@ export class ModalView {
       W / 2,
       by + 28
     );
+
+    // 适龄提示规范：CADPA 8+ 标志（首屏合规要求）
+    if (state === 'ready') {
+      c.font = `500 9px ${FONT}`;
+      c.fillStyle = '#64748b';
+      c.textAlign = 'center';
+      c.fillText('💚 CADPA 适龄提示 8+ | 适合8岁及以上用户', W / 2, py + ph - 6);
+    }
   }
 
   _drawSettingsModal(c, W, H, side, settings, controlsOut) {

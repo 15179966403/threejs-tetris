@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "minigame": "vite build --config vite.minigame.config.js",
-    "minigame:watch": "vite build --config vite.minigame.config.js --watch"
+    "minigame:watch": "vite build --config vite.minigame.config.js --watch",
+    "test": "node tests/smoke.mjs && node tests/settings.mjs && node tests/audio.mjs && node tests/scene.mjs && node tests/modes.mjs && node tests/compliance.mjs"
   },
   "dependencies": {
     "three": "^0.162.0"

@@ -152,6 +152,10 @@ export class Input {
           if (this.a.returnHome) this.a.returnHome();
           return;
         }
+        if (hit === 'btnShare') {
+          if (this.a.share) this.a.share();
+          return;
+        }
         if (hit && hit.startsWith('mode_')) {
           const mode = hit.replace('mode_', '');
           if (this.a.setGameMode) this.a.setGameMode(mode);

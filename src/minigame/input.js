@@ -122,9 +122,23 @@ export class Input {
       const y = t.clientY;
       const id = t.identifier;
 
-      // 浮层状态（ready / paused / gameover）：抬起时触发主操作；左右手/双手切换按钮响应切换
+      // 浮层状态（ready / paused / gameover / settings）：
       if (st !== 'playing' && st !== 'clearing') {
         const hit = this.ui.hitControl(x, y);
+        if (hit === 'settingsClose') {
+          if (this.a.closeSettings) this.a.closeSettings();
+          else this.ui.closeSettings();
+          return;
+        }
+        if (hit === 'settingVibe') {
+          if (this.a.toggleVibrate) this.a.toggleVibrate();
+          return;
+        }
+        if (hit && hit.startsWith('settingMode_')) {
+          const mode = hit.replace('settingMode_', '');
+          if (this.a.setControlMode) this.a.setControlMode(mode);
+          return;
+        }
         if (hit === 'swapOverlay' || hit === 'swapTop') {
           this.a.swap();
           return;

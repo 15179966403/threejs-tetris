@@ -5,6 +5,7 @@ import { BoardView } from './BoardView.js';
 import { GameUI } from './ui.js';
 import { Input } from './input.js';
 import { COLS, ROWS } from '../constants.js';
+import { settingsManager } from '../services/SettingsManager.js';
 
 /* global wx */
 
@@ -92,19 +93,17 @@ const view = new BoardView(scene);
 const game = new TetrisGame();
 
 /* ================= UI 叠加层（正交相机 + CanvasTexture 全屏面片） ================= */
-
-// 布局持久化：dual | left | right（默认 dual 双手持握模式）
-let dpadSide = 'dual';
-try {
-  const stored = wx.getStorageSync('tetris3d_dpad_side');
-  if (stored === 'left' || stored === 'right' || stored === 'dual') {
-    dpadSide = stored;
-  }
-} catch (e) { /* 忽略 */ }
-
-const ui = new GameUI(BASE_DPR, dpadSide);
+ 
+const initialMode = settingsManager.get('controlMode');
+const ui = new GameUI(BASE_DPR, initialMode);
 ui.resize(W, H, TOP, BOTTOM_INSET);
-
+ 
+settingsManager.subscribe((settings) => {
+  if (settings.controlMode && settings.controlMode !== ui.side) {
+    ui.setSide(settings.controlMode);
+  }
+});
+ 
 const uiScene = new THREE.Scene();
 const uiCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 const uiQuad = new THREE.Mesh(
@@ -119,9 +118,9 @@ const uiQuad = new THREE.Mesh(
 );
 uiQuad.frustumCulled = false;
 uiScene.add(uiQuad);
-
+ 
 /* ================= 相机取景（自适应窗口） ================= */
-
+ 
 const CAM_BASE = { x: 0, y: 0 };
 function fitCamera() {
   camera.aspect = W / H;
@@ -136,7 +135,7 @@ function fitCamera() {
   camera.updateProjectionMatrix();
 }
 fitCamera();
-
+ 
 wx.onWindowResize &&
   wx.onWindowResize((res) => {
     W = res.windowWidth;
@@ -148,16 +147,16 @@ wx.onWindowResize &&
     ui.resize(W, H, curTop, BOTTOM_INSET);
     fitCamera();
   });
-
+ 
 /* ================= 最高分持久化 ================= */
-
+ 
 let best = 0;
 try {
   best = wx.getStorageSync('tetris3d_best') | 0;
 } catch (e) { /* 忽略存储异常 */ }
-
+ 
 /* ================= 动作封装（带状态闸门） ================= */
-
+ 
 const inPlay = () => game.state === 'playing';
 const actions = {
   getState: () => game.state,
@@ -174,12 +173,21 @@ const actions = {
     if (game.state === 'playing' || game.state === 'paused') game.togglePause();
   },
   swap: () => {
-    const side =
-      ui.side === 'dual' ? 'left' : ui.side === 'left' ? 'right' : 'dual';
-    ui.setSide(side);
-    try {
-      wx.setStorageSync('tetris3d_dpad_side', side);
-    } catch (e) { /* 忽略 */ }
+    settingsManager.cycleControlMode();
+    vibrate('light');
+  },
+  openSettings: () => {
+    ui.openSettings();
+  },
+  closeSettings: () => {
+    ui.closeSettings();
+  },
+  setControlMode: (mode) => {
+    settingsManager.set('controlMode', mode);
+    vibrate('light');
+  },
+  toggleVibrate: () => {
+    settingsManager.toggle('vibrateEnabled');
     vibrate('light');
   },
   primary: () => {
@@ -209,8 +217,9 @@ const actions = {
   },
 };
 const input = new Input(ui, actions);
-
+ 
 function vibrate(type) {
+  if (!settingsManager.get('vibrateEnabled')) return;
   try {
     wx.vibrateShort({ type });
   } catch (e) { /* 老基础库无 type 参数等情况 */ }

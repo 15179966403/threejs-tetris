@@ -55,18 +55,19 @@ export class GameUI {
     this.H = 0;
     this.top = 0; // 刘海安全区高度
     this.bottom = 0; // 底部安全区高度（Home Bar）
-    this.side = side === 'right' ? 'right' : 'left';
-    this.controls = {}; // 十字键四臂 / 暂停 / 切换按键 的命中区
+    this.side = side === 'right' ? 'right' : side === 'left' ? 'left' : 'dual';
+    this.controls = {}; // 十字键四臂 / 动作键 / 暂停 / 切换按键 的命中区
     this.itemPanel = null; // 道具预留面板
     this.deckY = 0;
     this.deckH = 0;
+    this._pressedSet = new Set();
 
     // 道具使用目标选取状态
     this.targeting = {
       active: false,
       itemIdx: -1,
       mode: 'cols', // 'cols' | 'rows'
-      startIdx: 4,
+      startIdx: 3,
       dir: 'down',
     };
 
@@ -100,7 +101,7 @@ export class GameUI {
   }
 
   setSide(side) {
-    const s = side === 'right' ? 'right' : 'left';
+    const s = side === 'right' ? 'right' : side === 'left' ? 'left' : 'dual';
     if (s === this.side) return;
     this.side = s;
     this._layout();
@@ -133,7 +134,7 @@ export class GameUI {
     const deckY = H - deckH;
     // 控件垂直中心：确保十字键下边缘与底部安全区保留 bottomPad 间距，彻底避开 Home Bar
     const cy = deckY + topPad + cross / 2;
-    const cx = this.side === 'left' ? m + cross / 2 : W - m - cross / 2;
+    const cx = this.side === 'right' ? W - m - cross / 2 : m + cross / 2;
 
     this.deckY = deckY;
     this.deckH = deckH;
@@ -144,42 +145,105 @@ export class GameUI {
       down: { x: cx - arm / 2, y: cy + cross / 2 - arm, w: arm, h: arm },
       left: { x: cx - cross / 2, y: cy - arm / 2, w: arm, h: arm },
       right: { x: cx + cross / 2 - arm, y: cy - arm / 2, w: arm, h: arm },
+      btnRotate: null,
+      btnHardDrop: null,
     };
 
-    // 道具栏面板（与十字键垂直中心对称）
-    const zoneX = this.side === 'left' ? m + cross + 10 : m;
-    const zoneW = W - m * 2 - cross - 20;
-    const itemW = Math.max(104, Math.min(124, Math.floor(zoneW * 0.52)));
-    const itemH = Math.min(cross, cross - 10);
-    const itemX = this.side === 'left' ? W - m - itemW : m;
-    this.itemPanel = { x: itemX, y: cy - itemH / 2, w: itemW, h: itemH };
+    if (this.side === 'dual') {
+      // ===== 双手持握模式：左手十字键，右手动作键（旋转/硬降），居中道具栏与暂停 =====
+      // 1. 右手动作键（人体工学微斜对角排布）
+      const rotR = Math.max(26, Math.min(29, Math.floor(cross * 0.22)));
+      const rotX = W - m - cross * 0.36;
+      const rotY = cy - cross * 0.16;
+      this.controls.btnRotate = {
+        cx: rotX,
+        cy: rotY,
+        r: rotR,
+        x: rotX - rotR - 4,
+        y: rotY - rotR - 4,
+        w: (rotR + 4) * 2,
+        h: (rotR + 4) * 2,
+      };
 
-    // 道具 5 个槽位：上排 3 个，下排 2 个居中
-    const slotS = Math.max(26, Math.min(30, Math.floor((itemW - 20) / 3)));
-    const gapX = Math.floor((itemW - 16 - slotS * 3) / 2);
-    const row1W = slotS * 3 + gapX * 2;
-    const row2W = slotS * 2 + gapX;
-    const r1X = itemX + (itemW - row1W) / 2;
-    const r2X = itemX + (itemW - row2W) / 2;
-    const r1Y = cy - itemH / 2 + 34;
-    const r2Y = r1Y + slotS + 6;
+      const dropR = Math.max(22, Math.min(25, Math.floor(cross * 0.19)));
+      const dropX = W - m - cross * 0.72;
+      const dropY = cy + cross * 0.18;
+      this.controls.btnHardDrop = {
+        cx: dropX,
+        cy: dropY,
+        r: dropR,
+        x: dropX - dropR - 4,
+        y: dropY - dropR - 4,
+        w: (dropR + 4) * 2,
+        h: (dropR + 4) * 2,
+      };
 
-    this.controls.slots = [
-      { x: r1X, y: r1Y, w: slotS, h: slotS },
-      { x: r1X + slotS + gapX, y: r1Y, w: slotS, h: slotS },
-      { x: r1X + (slotS + gapX) * 2, y: r1Y, w: slotS, h: slotS },
-      { x: r2X, y: r2Y, w: slotS, h: slotS },
-      { x: r2X + slotS + gapX, y: r2Y, w: slotS, h: slotS },
-    ];
+      // 2. 中部道具栏与暂停键
+      const midW = Math.max(90, W - (m + cross) * 2 - 8);
+      const itemW = Math.min(midW, 116);
+      const itemX = Math.round((W - itemW) / 2);
+      const pauseW = Math.min(58, itemW);
+      const pauseH = 24;
+      const pauseY = deckY + 4;
+      this.controls.pause = { x: Math.round((W - pauseW) / 2), y: pauseY, w: pauseW, h: pauseH };
 
-    // 中部控制区：仅保留一枚独立的“暂停 / 开始”胶囊键，居中对称
-    const pillW = Math.max(52, Math.min(68, zoneW - itemW - 12));
-    const pillH = 32;
-    const pillCx =
-      this.side === 'left'
-        ? zoneX + (zoneW - itemW) / 2
-        : zoneX + itemW + (zoneW - itemW) / 2;
-    this.controls.pause = { x: pillCx - pillW / 2, y: cy - pillH / 2, w: pillW, h: pillH };
+      const itemY = pauseY + pauseH + 4;
+      const itemH = deckH - (pauseH + 4 + 4) - bottomInset - bottomPad;
+      this.itemPanel = { x: itemX, y: itemY, w: itemW, h: itemH };
+
+      // 道具 5 个槽位：上排 3 个，下排 2 个居中
+      const slotS = Math.max(24, Math.min(28, Math.floor((itemW - 16) / 3)));
+      const gapX = Math.floor((itemW - 14 - slotS * 3) / 2);
+      const row1W = slotS * 3 + gapX * 2;
+      const row2W = slotS * 2 + gapX;
+      const r1X = itemX + (itemW - row1W) / 2;
+      const r2X = itemX + (itemW - row2W) / 2;
+      const r1Y = itemY + 28;
+      const r2Y = r1Y + slotS + 4;
+
+      this.controls.slots = [
+        { x: r1X, y: r1Y, w: slotS, h: slotS },
+        { x: r1X + slotS + gapX, y: r1Y, w: slotS, h: slotS },
+        { x: r1X + (slotS + gapX) * 2, y: r1Y, w: slotS, h: slotS },
+        { x: r2X, y: r2Y, w: slotS, h: slotS },
+        { x: r2X + slotS + gapX, y: r2Y, w: slotS, h: slotS },
+      ];
+    } else {
+      // ===== 单手模式（左手或右手）：十字键在单侧，道具栏在对侧，暂停在中间 =====
+      const zoneX = this.side === 'left' ? m + cross + 10 : m;
+      const zoneW = W - m * 2 - cross - 20;
+      const itemW = Math.max(104, Math.min(124, Math.floor(zoneW * 0.52)));
+      const itemH = Math.min(cross, cross - 10);
+      const itemX = this.side === 'left' ? W - m - itemW : m;
+      this.itemPanel = { x: itemX, y: cy - itemH / 2, w: itemW, h: itemH };
+
+      // 道具 5 个槽位：上排 3 个，下排 2 个居中
+      const slotS = Math.max(26, Math.min(30, Math.floor((itemW - 20) / 3)));
+      const gapX = Math.floor((itemW - 16 - slotS * 3) / 2);
+      const row1W = slotS * 3 + gapX * 2;
+      const row2W = slotS * 2 + gapX;
+      const r1X = itemX + (itemW - row1W) / 2;
+      const r2X = itemX + (itemW - row2W) / 2;
+      const r1Y = cy - itemH / 2 + 34;
+      const r2Y = r1Y + slotS + 6;
+
+      this.controls.slots = [
+        { x: r1X, y: r1Y, w: slotS, h: slotS },
+        { x: r1X + slotS + gapX, y: r1Y, w: slotS, h: slotS },
+        { x: r1X + (slotS + gapX) * 2, y: r1Y, w: slotS, h: slotS },
+        { x: r2X, y: r2Y, w: slotS, h: slotS },
+        { x: r2X + slotS + gapX, y: r2Y, w: slotS, h: slotS },
+      ];
+
+      // 中部控制区：仅保留一枚独立的“暂停 / 开始”胶囊键，居中对称
+      const pillW = Math.max(52, Math.min(68, zoneW - itemW - 12));
+      const pillH = 32;
+      const pillCx =
+        this.side === 'left'
+          ? zoneX + (zoneW - itemW) / 2
+          : zoneX + itemW + (zoneW - itemW) / 2;
+      this.controls.pause = { x: pillCx - pillW / 2, y: cy - pillH / 2, w: pillW, h: pillH };
+    }
 
     // 目标选取控制区（在 targeting 模式下接管控制台区域）
     const tgtBtnH = 34;
@@ -250,6 +314,10 @@ export class GameUI {
     if (playing) {
       if (inR(c.swapTop)) return 'swapTop';
       if (inR(c.pause)) return 'pause';
+      if (this.side === 'dual') {
+        if (inR(c.btnRotate)) return 'btnRotate';
+        if (inR(c.btnHardDrop)) return 'btnHardDrop';
+      }
       for (const k of ['up', 'down', 'left', 'right']) {
         if (inR(c[k])) return k;
       }
@@ -267,11 +335,36 @@ export class GameUI {
     return null;
   }
 
-  setPressed(name) {
-    if (this._cache.pressed !== name) {
-      this._cache.pressed = name;
-      this.dirty = true;
+  setPressed(name, isPressed = true) {
+    if (name === null) {
+      if (this._pressedSet && this._pressedSet.size > 0) {
+        this._pressedSet.clear();
+        this._cache.pressed = null;
+        this.dirty = true;
+      }
+      return;
     }
+    if (!this._pressedSet) this._pressedSet = new Set();
+    if (isPressed) {
+      if (!this._pressedSet.has(name)) {
+        this._pressedSet.add(name);
+        this._cache.pressed = name;
+        this.dirty = true;
+      }
+    } else {
+      if (this._pressedSet.has(name)) {
+        this._pressedSet.delete(name);
+        this._cache.pressed = this._pressedSet.values().next().value || null;
+        this.dirty = true;
+      }
+    }
+  }
+
+  isPressed(name) {
+    if (this._pressedSet && this._pressedSet.size > 0) {
+      return this._pressedSet.has(name);
+    }
+    return this._cache.pressed === name;
   }
 
   /**
@@ -453,10 +546,9 @@ export class GameUI {
       c.restore();
     }
     c.textAlign = 'left';
-    // ---- 顶部防误触左右手快捷切换按键 ----
+    // ---- 顶部防误触左右手/双手快捷切换按键 ----
     const tb = this.controls.swapTop;
     if (tb) {
-      const isRight = this.side === 'right';
       c.fillStyle = 'rgba(13, 18, 38, 0.72)';
       c.strokeStyle = 'rgba(120, 140, 255, 0.35)';
       c.lineWidth = 1;
@@ -467,7 +559,9 @@ export class GameUI {
       c.font = `500 11px ${FONT}`;
       c.fillStyle = '#aab6dd';
       c.textAlign = 'center';
-      c.fillText(isRight ? '🖐 右手' : '🖐 左手', tb.x + tb.w / 2, tb.y + tb.h / 2 + 3.5);
+      const label =
+        this.side === 'dual' ? '👐 双手' : this.side === 'right' ? '👉 右手' : '👈 左手';
+      c.fillText(label, tb.x + tb.w / 2, tb.y + tb.h / 2 + 3.5);
       c.textAlign = 'left';
     }
   }
@@ -494,6 +588,9 @@ export class GameUI {
     c.stroke();
 
     this._drawDpad(c);
+    if (this.side === 'dual') {
+      this._drawActionButtons(c);
+    }
     this._drawItemPanel(c, game);
     this._drawPauseButton(c);
   }
@@ -526,7 +623,7 @@ export class GameUI {
     // 四臂：按下高亮 + 方向箭头
     for (const k of ['up', 'down', 'left', 'right']) {
       const r = d[k];
-      const pressed = this._cache.pressed === k;
+      const pressed = this.isPressed(k);
       if (pressed) {
         c.fillStyle = 'rgba(34, 211, 238, 0.22)';
         c.strokeStyle = ACCENT;
@@ -546,6 +643,68 @@ export class GameUI {
       c.closePath();
       c.fill();
     }
+  }
+
+  _drawActionButtons(c) {
+    const { btnRotate, btnHardDrop } = this.controls;
+    if (!btnRotate || !btnHardDrop) return;
+
+    // 1. 旋转按键 (btnRotate, ↻)
+    const rotPressed = this.isPressed('btnRotate');
+    this._drawActionButton(c, btnRotate, rotPressed, {
+      border: rotPressed ? '#38bdf8' : 'rgba(34, 211, 238, 0.45)',
+      grad1: rotPressed ? '#0284c7' : '#1e294f',
+      grad2: rotPressed ? '#0ea5e9' : '#0f172a',
+      iconColor: rotPressed ? '#ffffff' : '#38bdf8',
+      textColor: rotPressed ? '#ffffff' : '#94a3b8',
+      icon: '↻',
+      text: '旋转',
+    });
+
+    // 2. 硬降按键 (btnHardDrop, ⤓)
+    const dropPressed = this.isPressed('btnHardDrop');
+    this._drawActionButton(c, btnHardDrop, dropPressed, {
+      border: dropPressed ? '#facc15' : 'rgba(250, 204, 21, 0.45)',
+      grad1: dropPressed ? '#d97706' : '#28214a',
+      grad2: dropPressed ? '#f59e0b' : '#16112c',
+      iconColor: dropPressed ? '#ffffff' : '#fbbf24',
+      textColor: dropPressed ? '#ffffff' : '#94a3b8',
+      icon: '⤓',
+      text: '硬降',
+    });
+  }
+
+  _drawActionButton(c, btn, pressed, opt) {
+    const { cx, cy, r } = btn;
+    c.save();
+    c.beginPath();
+    c.arc(cx, cy, r, 0, Math.PI * 2);
+
+    const grad = c.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+    grad.addColorStop(0, opt.grad1);
+    grad.addColorStop(1, opt.grad2);
+    c.fillStyle = grad;
+    c.fill();
+
+    c.strokeStyle = opt.border;
+    c.lineWidth = pressed ? 2.5 : 1.5;
+    if (pressed) {
+      c.shadowColor = opt.border;
+      c.shadowBlur = 10;
+    }
+    c.stroke();
+    c.shadowBlur = 0;
+
+    // 图标与文字
+    c.textAlign = 'center';
+    c.fillStyle = opt.iconColor;
+    c.font = `700 ${Math.round(r * 0.72)}px ${FONT}`;
+    c.fillText(opt.icon, cx, cy + Math.round(r * 0.04));
+
+    c.fillStyle = opt.textColor;
+    c.font = `600 ${Math.max(9, Math.round(r * 0.36))}px ${FONT}`;
+    c.fillText(opt.text, cx, cy + Math.round(r * 0.62));
+    c.restore();
   }
 
   _drawItemPanel(c, game) {
@@ -860,7 +1019,6 @@ export class GameUI {
     const swX = px + (pw - swW) / 2;
     this.controls.swapOverlay = { x: swX, y: swY, w: swW, h: swH };
 
-    const isRight = this.side === 'right';
     c.fillStyle = 'rgba(20, 28, 58, 0.85)';
     c.strokeStyle = 'rgba(120, 140, 255, 0.45)';
     c.lineWidth = 1;
@@ -871,11 +1029,13 @@ export class GameUI {
     c.font = `500 12px ${FONT}`;
     c.fillStyle = '#c5d1ec';
     c.textAlign = 'center';
-    c.fillText(
-      isRight ? '🖐 操作模式：右手 (点击切换)' : '🖐 操作模式：左手 (点击切换)',
-      swX + swW / 2,
-      swY + swH / 2 + 4
-    );
+    const modeText =
+      this.side === 'dual'
+        ? '👐 操作模式：双手 (点击切换)'
+        : this.side === 'right'
+          ? '👉 操作模式：右手 (点击切换)'
+          : '👈 操作模式：左手 (点击切换)';
+    c.fillText(modeText, swX + swW / 2, swY + swH / 2 + 4);
 
     // 主操作按钮
     const bw = 184;

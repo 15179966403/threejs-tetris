@@ -1,13 +1,20 @@
 /**
- * 触屏输入层 —— 小霸王十字键方案。
+ * 触屏输入层 —— 支持双手持握多点触控与经典小霸王十字键方案。
  *
- *   ← →  移动（按下立即执行，长按 DAS 连发：180ms 延迟后每 45ms 一次）
- *   ↑    旋转
- *   ↓    加速下落（同长按连发）；快速连按两下 ↓ = 硬降（双击窗口 280ms）
- *   暂停  暂停游戏（居中药丸键）
- *   顶部/弹窗  切换左右手布局（远离操作区防误触）
- *   手指在十字键上滑动可直接切到相邻臂（实体手柄手感）
- *   浮层状态：点主按钮/任意处 = 主操作（开始/继续/再来一局）；切换按钮可随时切换布局
+ *   左手/单手 十字键：
+ *     ← →  移动（按下立即执行，长按 DAS 连发：180ms 延迟后每 45ms 一次）
+ *     ↑    旋转
+ *     ↓    加速下落（同长按连发）；快速连按两下 ↓ = 硬降（双击窗口 280ms）
+ *   右手 动作键（双手持握模式）：
+ *     ↻ 旋转键   顺时针旋转方块
+ *     ⤓ 硬降键   瞬间直落并锁定
+ *   中置/顶部 控件：
+ *     暂停       暂停游戏（居中胶囊键）
+ *     顶部/弹窗   切换双手/左手/右手布局（三模循环，远离操作区防误触）
+ *     道具槽位   点击直接使用/选取目标
+ *
+ *   多点触控（Multi-Touch）：
+ *     左手按住方向平移/连发时，右手可同时并发点按旋转或硬降，互不干扰阻断。
  *
  * 注意：小游戏包内不使用 class #private 语法（见 BoardView.js 顶部说明）。
  */
@@ -20,12 +27,13 @@ const DOUBLE_TAP_MS = 280; // 连按两下 ↓ 触发硬降的窗口
 export class Input {
   /**
    * @param ui  GameUI 实例（命中测试 / 按压态）
-   * @param actions { getState, move, rotate, softDrop, hardDrop, pause, swap, primary }
+   * @param actions { getState, move, rotate, softDrop, hardDrop, pause, swap, primary, clickSlot, useGravity }
    */
   constructor(ui, actions) {
     this.ui = ui;
     this.a = actions;
     this.dpadTouch = null; // { id, control } 十字键当前手指
+    this.actionTouch = null; // { id, control } 动作键当前手指
     this.held = null; // { act, t, rep } 长按连发
     this.overlayTouch = false;
     this._downPressedAt = 0; // 本次 ↓ 按下时刻
@@ -34,7 +42,7 @@ export class Input {
     wx.onTouchStart((e) => this._onStart(e));
     wx.onTouchMove((e) => this._onMove(e));
     wx.onTouchEnd((e) => this._onEnd(e));
-    wx.onTouchCancel(() => this._release());
+    wx.onTouchCancel(() => this._releaseAll());
   }
 
   /** 主循环每帧调用：驱动长按连发 */
@@ -51,14 +59,17 @@ export class Input {
     }
   }
 
-  _release() {
+  _releaseAll() {
     this.held = null;
+    this.dpadTouch = null;
+    this.actionTouch = null;
+    this.overlayTouch = false;
     this.ui.setPressed(null);
   }
 
-  /** 按下某个控件：立即执行对应动作，方向键附带长按连发 */
-  _press(control, id) {
-    this.ui.setPressed(control);
+  /** 按下十字键四臂之一：立即执行，方向键附带长按连发 */
+  _pressDpad(control, id) {
+    this.ui.setPressed(control, true);
     this.dpadTouch = { id, control };
 
     if (control === 'up') {
@@ -75,7 +86,6 @@ export class Input {
 
     if (control === 'down') {
       this._downPressedAt = Date.now();
-      // 连按两下 ↓（两次快速点按）= 硬降；长按后或滑过后不算「连按」
       const now = Date.now();
       if (this._downReleasedQuickly && now - this._downReleasedQuickly < DOUBLE_TAP_MS) {
         this._downReleasedQuickly = 0;
@@ -89,96 +99,117 @@ export class Input {
     this.held = { act, t: 0, rep: 0 };
   }
 
+  /** 按下右手独立动作键（双手持握模式）：旋转 / 硬降 */
+  _pressAction(control, id) {
+    this.ui.setPressed(control, true);
+    this.actionTouch = { id, control };
+
+    if (control === 'btnRotate') {
+      this.a.rotate(1);
+    } else if (control === 'btnHardDrop') {
+      this.a.hardDrop();
+    }
+  }
+
   _onStart(e) {
-    const t = e.touches[0];
-    if (!t) return;
-    const x = t.clientX;
-    const y = t.clientY;
+    const touches = e.changedTouches || (e.touches ? [e.touches[0]] : []);
     const st = this.a.getState();
 
-    // 浮层状态（ready / paused / gameover）：抬起时触发主操作；左右手切换按钮响应切换
-    if (st !== 'playing' && st !== 'clearing') {
+    for (let i = 0; i < touches.length; i++) {
+      const t = touches[i];
+      if (!t) continue;
+      const x = t.clientX;
+      const y = t.clientY;
+      const id = t.identifier;
+
+      // 浮层状态（ready / paused / gameover）：抬起时触发主操作；左右手/双手切换按钮响应切换
+      if (st !== 'playing' && st !== 'clearing') {
+        const hit = this.ui.hitControl(x, y);
+        if (hit === 'swapOverlay' || hit === 'swapTop') {
+          this.a.swap();
+          return;
+        }
+        this.overlayTouch = true;
+        return;
+      }
+
+      // 道具目标选取模式下的触控分发
+      if (this.ui.targeting && this.ui.targeting.active) {
+        const tgt = this.ui.targeting;
+        const hit = this.ui.hitControl(x, y);
+        if (hit === 'targetColTab') {
+          tgt.mode = 'cols';
+          tgt.startIdx = Math.min(7, tgt.startIdx);
+          this.ui.dirty = true;
+          return;
+        }
+        if (hit === 'targetRowTab') {
+          tgt.mode = 'rows';
+          tgt.startIdx = Math.min(18, tgt.startIdx);
+          this.ui.dirty = true;
+          return;
+        }
+        if (hit === 'targetPrev') {
+          tgt.startIdx = Math.max(0, tgt.startIdx - 1);
+          this.ui.dirty = true;
+          return;
+        }
+        if (hit === 'targetNext') {
+          const max = tgt.mode === 'cols' ? 7 : 18;
+          tgt.startIdx = Math.min(max, tgt.startIdx + 1);
+          this.ui.dirty = true;
+          return;
+        }
+        if (hit === 'targetConfirm') {
+          this.a.useGravity(tgt.mode, tgt.startIdx, tgt.dir);
+          this.ui.cancelTargeting();
+          return;
+        }
+        if (hit === 'targetCancel') {
+          this.ui.cancelTargeting();
+          return;
+        }
+        if (hit === 'boardArea') {
+          this._updateTargetByCoords(x, y);
+          return;
+        }
+        return;
+      }
+
       const hit = this.ui.hitControl(x, y);
-      if (hit === 'swapOverlay' || hit === 'swapTop') {
+      if (!hit) continue;
+
+      // 游戏中：顶部切换模式
+      if (hit === 'swapTop') {
         this.a.swap();
-        return;
+        continue;
       }
-      this.overlayTouch = true;
-      return;
+
+      // 游戏中：点击暂停
+      if (hit === 'pause') {
+        this.a.pause();
+        continue;
+      }
+
+      // 点击道具槽位
+      if (hit.startsWith('slot_')) {
+        const slotIdx = parseInt(hit.split('_')[1], 10);
+        this.a.clickSlot(slotIdx);
+        continue;
+      }
+
+      // 双手模式右手动作键
+      if (hit === 'btnRotate' || hit === 'btnHardDrop') {
+        this._pressAction(hit, id);
+        continue;
+      }
+
+      // 十字键方向控制
+      if (hit === 'up' || hit === 'down' || hit === 'left' || hit === 'right') {
+        this._pressDpad(hit, id);
+        continue;
+      }
     }
-
-    // 道具目标选取模式下的触控分发
-    if (this.ui.targeting && this.ui.targeting.active) {
-      const tgt = this.ui.targeting;
-      const hit = this.ui.hitControl(x, y);
-      if (hit === 'targetColTab') {
-        tgt.mode = 'cols';
-        tgt.startIdx = Math.min(7, tgt.startIdx);
-        this.ui.dirty = true;
-        return;
-      }
-      if (hit === 'targetRowTab') {
-        tgt.mode = 'rows';
-        tgt.startIdx = Math.min(18, tgt.startIdx);
-        this.ui.dirty = true;
-        return;
-      }
-      if (hit === 'targetPrev') {
-        tgt.startIdx = Math.max(0, tgt.startIdx - 1);
-        this.ui.dirty = true;
-        return;
-      }
-      if (hit === 'targetNext') {
-        const max = tgt.mode === 'cols' ? 7 : 18;
-        tgt.startIdx = Math.min(max, tgt.startIdx + 1);
-        this.ui.dirty = true;
-        return;
-      }
-      if (hit === 'targetConfirm') {
-        this.a.useGravity(tgt.mode, tgt.startIdx, tgt.dir);
-        this.ui.cancelTargeting();
-        return;
-      }
-      if (hit === 'targetCancel') {
-        this.ui.cancelTargeting();
-        return;
-      }
-      if (hit === 'boardArea') {
-        this._updateTargetByCoords(x, y);
-        return;
-      }
-      return;
-    }
-
-    const hit = this.ui.hitControl(x, y);
-
-    // 点击道具槽位
-    if (hit && hit.startsWith('slot_')) {
-      const idx = parseInt(hit.split('_')[1], 10);
-      this.a.clickSlot(idx);
-      return;
-    }
-
-    // 游戏中：顶部切换左右手
-    if (hit === 'swapTop') {
-      this.a.swap();
-      return;
-    }
-
-    // 游戏中：点击暂停
-    if (hit === 'pause') {
-      this.a.pause();
-      return;
-    }
-
-    // 已有手指按住十字键：第二根手指只响应暂停或顶部切换
-    if (this.dpadTouch) {
-      if (hit === 'pause') this.a.pause();
-      else if (hit === 'swapTop') this.a.swap();
-      return;
-    }
-
-    if (hit) this._press(hit, t.identifier);
   }
 
   _onMove(e) {
@@ -187,19 +218,20 @@ export class Input {
       if (t) this._updateTargetByCoords(t.clientX, t.clientY);
       return;
     }
+
+    // 手指在十字键上滑动切臂（支持连续滑动）
     const g = this.dpadTouch;
     if (!g) return;
-    const t = e.touches.find((tt) => tt.identifier === g.id) || e.touches[0];
+    const t = Array.from(e.touches || []).find((tt) => tt.identifier === g.id);
     if (!t) return;
     const hit = this.ui.hitControl(t.clientX, t.clientY);
-    // 手指滑到相邻臂：松开旧臂、按下新臂（实体十字键手感）
     if (
       hit &&
       hit !== g.control &&
       (hit === 'up' || hit === 'down' || hit === 'left' || hit === 'right')
     ) {
-      this._release();
-      this._press(hit, g.id);
+      this.ui.setPressed(g.control, false);
+      this._pressDpad(hit, g.id);
     }
   }
 
@@ -230,18 +262,26 @@ export class Input {
       this.a.primary();
       return;
     }
-    if (!this.dpadTouch) return;
-    const t =
-      (e.changedTouches || []).find((tt) => tt.identifier === this.dpadTouch.id) ||
-      e.changedTouches[0];
-    if (!t) return;
-    // ↓ 快速点按（<220ms）才计入双击窗口；长按/滑动不算
-    if (this.dpadTouch.control === 'down') {
-      const dur = Date.now() - (this._downPressedAt || 0);
-      this._downPressedAt = 0;
-      this._downReleasedQuickly = dur <= 220 ? Date.now() : 0;
+    const changed = e.changedTouches || (e.touches ? [e.touches[0]] : []);
+    for (let i = 0; i < changed.length; i++) {
+      const t = changed[i];
+      if (!t) continue;
+
+      if (this.dpadTouch && t.identifier === this.dpadTouch.id) {
+        if (this.dpadTouch.control === 'down') {
+          const dur = Date.now() - (this._downPressedAt || 0);
+          this._downPressedAt = 0;
+          this._downReleasedQuickly = dur <= 220 ? Date.now() : 0;
+        }
+        this.ui.setPressed(this.dpadTouch.control, false);
+        this.dpadTouch = null;
+        this.held = null;
+      }
+
+      if (this.actionTouch && t.identifier === this.actionTouch.id) {
+        this.ui.setPressed(this.actionTouch.control, false);
+        this.actionTouch = null;
+      }
     }
-    this._release();
-    this.dpadTouch = null;
   }
 }

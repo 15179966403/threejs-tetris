@@ -217,14 +217,18 @@ const P = (side) => side === 'left'
   ? { up: [78, 712], down: [78, 800], left: [34, 756], right: [122, 756], pause: [205, 756], swapTop: [244, 74] }
   : { up: [312, 712], down: [312, 800], left: [356, 756], right: [268, 756], pause: [174, 756], swapTop: [244, 74] };
 
-console.log('== 浮层上切换左右手 ==');
+console.log('== 浮层上切换布局模式（双手 / 左手 / 右手） ==');
 let mark = vibes.length;
-tap(195, 435); // 浮层换边键 → 右手
+tap(195, 435); // 浮层换边键：默认 dual → left
 assert(vibesSince(mark).includes('light'), '换边应触发震动');
-assert(stored['tetris3d_dpad_side'] === 'right', '布局应持久化为 right');
-tap(244, 74); // 顶部换边键 → 换回左
 assert(stored['tetris3d_dpad_side'] === 'left', '布局应持久化为 left');
-console.log('  换边 + 持久化 ✔');
+tap(244, 74); // 顶部换边键：left → right
+assert(stored['tetris3d_dpad_side'] === 'right', '布局应持久化为 right');
+tap(244, 74); // 顶部换边键：right → dual
+assert(stored['tetris3d_dpad_side'] === 'dual', '布局应持久化为 dual');
+tap(244, 74); // 顶部换边键：dual → left（便于后续固定坐标单测）
+assert(stored['tetris3d_dpad_side'] === 'left', '布局应持久化为 left');
+console.log('  三模切换 + 持久化 ✔');
 
 console.log('== 点按开始游戏 ==');
 tap(195, 500); // 浮层任意处 = 主操作
@@ -268,7 +272,41 @@ step(3, '恢复 playing（右手布局）');
 tap(174, 756); // 右手暂停键 → 暂停
 step(2, '再次暂停');
 tap(195, 500); // 恢复
-tap(244, 74); // 顶部换边键 → 换回左
+console.log('== 双手持握模式（dual）：右手动作键 + 双指并发多点触控 ==');
+tap(244, 74); // right → dual
+assert(stored['tetris3d_dpad_side'] === 'dual', '布局应切换为 dual');
+
+// 右手动作键：旋转
+tap(330, 735); // btnRotate
+step(2, '双手模式右手旋转');
+
+// 多点触控：左手按住向左移动，同时右手点按旋转
+touch.start({ touches: [{ identifier: 10, clientX: 34, clientY: 756 }], changedTouches: [{ identifier: 10, clientX: 34, clientY: 756 }] }); // 左手 ←
+step(2, '左手按住向左');
+touch.start({
+  touches: [
+    { identifier: 10, clientX: 34, clientY: 756 },
+    { identifier: 11, clientX: 330, clientY: 735 },
+  ],
+  changedTouches: [{ identifier: 11, clientX: 330, clientY: 735 }],
+}); // 右手同时按 ↻
+step(2, '右手并发点按旋转');
+touch.end({
+  touches: [{ identifier: 10, clientX: 34, clientY: 756 }],
+  changedTouches: [{ identifier: 11, clientX: 330, clientY: 735 }],
+});
+step(2, '右手抬起');
+touch.end({ touches: [], changedTouches: [{ identifier: 10, clientX: 34, clientY: 756 }] });
+step(2, '左手抬起');
+
+// 右手动作键：一键硬降
+mark = vibes.length;
+tap(283, 780); // btnHardDrop
+assert(vibesSince(mark).includes('light'), '硬降键应触发震动');
+step(10, '双手模式右手硬降');
+console.log('  双手模式独立动作键与多点触控并发 ✔');
+
+tap(244, 74); // 顶部换边键：dual → left
 step(3, '换回左手');
 assert(stored['tetris3d_dpad_side'] === 'left', '最终布局应为 left');
 

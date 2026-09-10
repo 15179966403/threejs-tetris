@@ -93,10 +93,13 @@ const game = new TetrisGame();
 
 /* ================= UI 叠加层（正交相机 + CanvasTexture 全屏面片） ================= */
 
-// 左右手布局持久化：十字键在哪一侧
-let dpadSide = 'left';
+// 布局持久化：dual | left | right（默认 dual 双手持握模式）
+let dpadSide = 'dual';
 try {
-  if (wx.getStorageSync('tetris3d_dpad_side') === 'right') dpadSide = 'right';
+  const stored = wx.getStorageSync('tetris3d_dpad_side');
+  if (stored === 'left' || stored === 'right' || stored === 'dual') {
+    dpadSide = stored;
+  }
 } catch (e) { /* 忽略 */ }
 
 const ui = new GameUI(BASE_DPR, dpadSide);
@@ -171,7 +174,8 @@ const actions = {
     if (game.state === 'playing' || game.state === 'paused') game.togglePause();
   },
   swap: () => {
-    const side = ui.side === 'left' ? 'right' : 'left';
+    const side =
+      ui.side === 'dual' ? 'left' : ui.side === 'left' ? 'right' : 'dual';
     ui.setSide(side);
     try {
       wx.setStorageSync('tetris3d_dpad_side', side);

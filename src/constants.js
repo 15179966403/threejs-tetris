@@ -89,3 +89,14 @@ export const LASER_CELL_SCORE = 10;
 
 /** 连锁消行最大波数（防止斜向取反无限循环） */
 export const MAX_COMBO = 8;
+
+// ============ 道具系统常量 ============
+
+/** 道具池最大容量（最多可持有 5 个道具） */
+export const MAX_ITEMS = 5;
+
+/** 1 级时获取道具所需的基础能量 */
+export const BASE_ITEM_ENERGY = 3;
+
+/** 每升 1 级所需能量增量：requiredEnergy = BASE_ITEM_ENERGY + (level - 1) * ITEM_ENERGY_STEP */
+export const ITEM_ENERGY_STEP = 1;

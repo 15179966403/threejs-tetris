@@ -10,6 +10,9 @@ import {
   FX_TYPES,
   LASER_CELL_SCORE,
   MAX_COMBO,
+  MAX_ITEMS,
+  BASE_ITEM_ENERGY,
+  ITEM_ENERGY_STEP,
 } from './constants.js';
 
 /** 方向 -> (列增量, 行增量)；行号向下增长，up 即 dy=-1 */
@@ -85,6 +88,15 @@ export class TetrisGame {
     this.clearingRows = [];
     this.decayQueue = []; // 待倒计时销毁的方块队列 [{ x, y, countdown }]
     this.fxEvents = []; // 视图特效事件队列（视图每帧消费后清空）
+
+    // 道具系统：道具池（最多 5 个）与能量
+    this.items = []; // [{ id, type: 'gravity', name: '重力', dir: 'down' }]
+    this.itemEnergy = 0; // 当前累积的能量
+  }
+
+  /** 当前等级获得下一个道具所需的能量需求 */
+  get requiredEnergy() {
+    return BASE_ITEM_ENERGY + (this.level - 1) * ITEM_ENERGY_STEP;
   }
 
   /** 每级下落间隔（秒），随等级加快 */
@@ -362,27 +374,25 @@ export class TetrisGame {
    * 斜向取反可能补全整行，因此消行会级联成 combo 连锁。
    */
   #finishClear() {
-    // 1. 收集被消除行中的特殊格，换算成消行下移后的列位作为效果起点
+    // 1. 收集被消除行中的特殊格（行尚未移除，直接使用原坐标——
+    //    「上/下/左/右/斜向」的方向语义与玩家所见完全一致）
     const triggers = [];
     for (const r of this.clearingRows) {
       for (let c = 0; c < COLS; c++) {
         const cell = this.board[r][c];
-        if (cell && cell.fx) {
-          const below = this.clearingRows.filter((rr) => rr > r).length;
-          triggers.push({ x: c, y: r + below, fx: cell.fx });
-        }
+        if (cell && cell.fx) triggers.push({ x: c, y: r, fx: cell.fx });
       }
     }
 
-    // 2. 常规消行 + 上方下移
-    this.#updateDecayQueueAfterClear(this.clearingRows);
-    this.board = this.board.filter((_, r) => !this.clearingRows.includes(r));
-    while (this.board.length < ROWS) this.board.unshift(Array(COLS).fill(null));
-    this.clearingRows = [];
-
-    // 3. 依次施加方向效果（正交激光清除 / 斜向取反，被清除的特殊格连锁入队）
+    // 2. 移除行之前施加方向效果：正交激光清除 / 斜向取反，
+    //    被清除的特殊格连锁入队，同样作用于消除前的棋盘。
+    //    （此前在“移除+下移之后”才施加，向上/斜向的起点换算存在错位，
+    //     导致紧邻上方的方块漏删）
     let cellsCleared = 0;
     const queue = triggers;
+    if (triggers.length) {
+      this.#addEnergy(triggers.length);
+    }
     while (queue.length) {
       const { x, y, fx } = queue.shift();
       const [dx, dy] = FX_DIRS[fx];
@@ -426,7 +436,11 @@ export class TetrisGame {
     }
     if (cellsCleared) this.score += cellsCleared * LASER_CELL_SCORE * this.level;
 
-    // 4. 连锁检测：效果可能补全整行 → 开启下一波（combo+1，得分倍率 ×(combo+1)）
+    // 3. 移除已消除的行 + 上方下移，随后按新布局校准倒计时销毁队列
+    this.board = this.board.filter((_, r) => !this.clearingRows.includes(r));
+    while (this.board.length < ROWS) this.board.unshift(Array(COLS).fill(null));
+    this.#updateDecayQueueAfterClear(this.clearingRows); // 必须在下移后校准（依赖新棋盘验证）
+    this.clearingRows = [];
     const full = [];
     for (let r = 0; r < ROWS; r++) if (this.board[r].every((v) => v)) full.push(r);
     if (full.length && this.combo < MAX_COMBO) {
@@ -465,7 +479,10 @@ export class TetrisGame {
       // 取反：有方块则消除（特殊格连锁入队），空位则生成异形块
       if (cell) {
         this.board[y][x] = null;
-        if (cell.fx) queue.push({ x, y, fx: cell.fx });
+        if (cell.fx) {
+          queue.push({ x, y, fx: cell.fx });
+          this.#addEnergy(1);
+        }
         touched.push([x, y, 0]);
         return 1;
       }
@@ -480,8 +497,202 @@ export class TetrisGame {
     }
     if (!cell) return 0;
     this.board[y][x] = null;
-    if (cell.fx) queue.push({ x, y, fx: cell.fx });
+    if (cell.fx) {
+      queue.push({ x, y, fx: cell.fx });
+      this.#addEnergy(1);
+    }
     touched.push([x, y, 0]);
     return 1;
   }
+
+  /** 触发特殊箭头方块时积攒道具能量 */
+  #addEnergy(amount = 1) {
+    this.itemEnergy += amount;
+    while (this.itemEnergy >= this.requiredEnergy && this.items.length < MAX_ITEMS) {
+      this.itemEnergy -= this.requiredEnergy;
+      const item = {
+        id: Date.now() + Math.random(),
+        type: 'gravity',
+        name: '重力',
+        dir: 'down',
+      };
+      this.items.push(item);
+      this.fxEvents.push({ type: 'item_gain', item: 'gravity' });
+    }
+    // 道具池已满时，能量在当前需求上限处封顶，不溢出浪费
+    if (this.items.length >= MAX_ITEMS) {
+      this.itemEnergy = Math.min(this.itemEnergy, this.requiredEnergy);
+    }
+  }
+
+  /**
+   * 使用重力道具
+   * @param {'rows' | 'cols'} mode 指定连续 2 行还是连续 2 列
+   * @param {number} startIdx 起始行号 (0 <= startIdx < ROWS - 1) 或起始列号 (0 <= startIdx < COLS - 1)
+   * @param {'down' | 'up' | 'left' | 'right'} [dir='down'] 位移方向，默认向下
+   * @returns {boolean} 是否成功使用
+   */
+  useGravity(mode, startIdx, dir = 'down') {
+    if (this.state !== 'playing') return false;
+    const itemIdx = this.items.findIndex((it) => it.type === 'gravity');
+    if (itemIdx === -1) return false;
+
+    // 消耗该道具
+    this.items.splice(itemIdx, 1);
+
+    // 执行重力位移
+    this.#applyGravityShift(mode, startIdx, dir);
+
+    // 同步校准 decayQueue
+    this.#syncDecayQueue();
+
+    // 产生特效事件
+    this.fxEvents.push({
+      type: 'gravity_pulse',
+      mode,
+      startIdx,
+      dir,
+    });
+
+    // 消耗道具后，若原本能量封顶满溢，则立刻兑换下一个道具
+    if (this.itemEnergy >= this.requiredEnergy && this.items.length < MAX_ITEMS) {
+      this.itemEnergy -= this.requiredEnergy;
+      const newItem = {
+        id: Date.now() + Math.random(),
+        type: 'gravity',
+        name: '重力',
+        dir: 'down',
+      };
+      this.items.push(newItem);
+      this.fxEvents.push({ type: 'item_gain', item: 'gravity' });
+    }
+
+    // 检查重力位移后是否补全了整行（连锁消行）
+    const full = [];
+    for (let r = 0; r < ROWS; r++) {
+      if (this.board[r].every((v) => v)) full.push(r);
+    }
+
+    if (full.length) {
+      this.combo = 0;
+      this.clearingRows = full;
+      this.clearPhase = 0;
+      this.clearTimer = 0;
+      this.state = 'clearing';
+      this.fxEvents.push({ type: 'clear', rows: full.slice() });
+      this.score += LINE_SCORES[full.length] * this.level;
+      this.lines += full.length;
+      this.level = Math.floor(this.lines / 10) + 1;
+    }
+
+    return true;
+  }
+
+  /** 执行重力物理位移：连续 2 行或连续 2 列朝指定方向下落/滑动直到受阻 */
+  #applyGravityShift(mode, startIdx, dir = 'down') {
+    if (mode === 'cols') {
+      const c1 = Math.max(0, Math.min(COLS - 2, startIdx));
+      const c2 = c1 + 1;
+      for (const c of [c1, c2]) {
+        if (dir === 'down') {
+          // 自下而上压实下坠
+          for (let r = ROWS - 2; r >= 0; r--) {
+            if (this.board[r][c]) {
+              let targetY = r;
+              while (targetY + 1 < ROWS && !this.board[targetY + 1][c]) {
+                targetY++;
+              }
+              if (targetY !== r) {
+                this.board[targetY][c] = this.board[r][c];
+                this.board[r][c] = null;
+              }
+            }
+          }
+        } else if (dir === 'up') {
+          for (let r = 1; r < ROWS; r++) {
+            if (this.board[r][c]) {
+              let targetY = r;
+              while (targetY - 1 >= 0 && !this.board[targetY - 1][c]) {
+                targetY--;
+              }
+              if (targetY !== r) {
+                this.board[targetY][c] = this.board[r][c];
+                this.board[r][c] = null;
+              }
+            }
+          }
+        }
+      }
+    } else if (mode === 'rows') {
+      const r1 = Math.max(0, Math.min(ROWS - 2, startIdx));
+      const r2 = r1 + 1;
+      if (dir === 'down') {
+        // 先处理下行，再处理上行，向下坠落
+        for (const r of [r2, r1]) {
+          for (let c = 0; c < COLS; c++) {
+            if (this.board[r][c]) {
+              let targetY = r;
+              while (targetY + 1 < ROWS && !this.board[targetY + 1][c]) {
+                targetY++;
+              }
+              if (targetY !== r) {
+                this.board[targetY][c] = this.board[r][c];
+                this.board[r][c] = null;
+              }
+            }
+          }
+        }
+      } else if (dir === 'left') {
+        for (const r of [r1, r2]) {
+          for (let c = 1; c < COLS; c++) {
+            if (this.board[r][c]) {
+              let targetX = c;
+              while (targetX - 1 >= 0 && !this.board[r][targetX - 1]) {
+                targetX--;
+              }
+              if (targetX !== c) {
+                this.board[r][targetX] = this.board[r][c];
+                this.board[r][c] = null;
+              }
+            }
+          }
+        }
+      } else if (dir === 'right') {
+        for (const r of [r1, r2]) {
+          for (let c = COLS - 2; c >= 0; c--) {
+            if (this.board[r][c]) {
+              let targetX = c;
+              while (targetX + 1 < COLS && !this.board[r][targetX + 1]) {
+                targetX++;
+              }
+              if (targetX !== c) {
+                this.board[r][targetX] = this.board[r][c];
+                this.board[r][c] = null;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /** 重力位移后同步校准 decayQueue 中方块的实际坐标 */
+  #syncDecayQueue() {
+    if (!this.decayQueue || !this.decayQueue.length) return;
+    for (const item of this.decayQueue) {
+      const cell = this.board[item.y] && this.board[item.y][item.x];
+      if (cell && cell.decay === item.countdown) continue;
+      let found = false;
+      for (let r = 0; r < ROWS && !found; r++) {
+        for (let c = 0; c < COLS && !found; c++) {
+          if (this.board[r][c] && this.board[r][c].decay === item.countdown) {
+            item.x = c;
+            item.y = r;
+            found = true;
+          }
+        }
+      }
+    }
+  }
 }
+

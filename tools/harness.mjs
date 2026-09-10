@@ -206,15 +206,23 @@ const tap = (x, y) => {
   touch.end({ touches: [], changedTouches: [{ identifier: 1, clientX: x, clientY: y }] });
 };
 const vibesSince = (n) => vibes.slice(n);
-
 console.log('== 初始化 + 首屏 ==');
 step(5, 'ready 状态帧');
 
-console.log('== 浮层上切换左右手（SELECT） ==');
+// 布局坐标（随换边镜像）：side=left 十字键在左；side=right 镜像到右侧
+// 左手: ↑(78,712) ↓(78,800) ←(34,756) →(122,756) 暂停(205,756)
+// 右手: ↑(312,712) ↓(312,800) ←(356,756) →(268,756) 暂停(174,756)
+// 顶部换边键固定 (244,74)；浮层换边键固定 (195,435)
+const P = (side) => side === 'left'
+  ? { up: [78, 712], down: [78, 800], left: [34, 756], right: [122, 756], pause: [205, 756], swapTop: [244, 74] }
+  : { up: [312, 712], down: [312, 800], left: [356, 756], right: [268, 756], pause: [174, 756], swapTop: [244, 74] };
+
+console.log('== 浮层上切换左右手 ==');
 let mark = vibes.length;
-tap(216, 759); // 左手布局的选择键 → 换到右手
-assert(vibesSince(mark).includes('light'), '选择键应触发换边震动');
-tap(166, 759); // 右手布局的选择键 → 换回左手
+tap(195, 435); // 浮层换边键 → 右手
+assert(vibesSince(mark).includes('light'), '换边应触发震动');
+assert(stored['tetris3d_dpad_side'] === 'right', '布局应持久化为 right');
+tap(244, 74); // 顶部换边键 → 换回左
 assert(stored['tetris3d_dpad_side'] === 'left', '布局应持久化为 left');
 console.log('  换边 + 持久化 ✔');
 
@@ -223,44 +231,44 @@ tap(195, 500); // 浮层任意处 = 主操作
 step(10, 'playing 渲染帧');
 
 console.log('== 十字键：↑旋转 / ←→移动 ==');
-tap(80, 729); // ↑ 旋转
-tap(33, 776); // ←
-tap(127, 776); // →
+tap(78, 712); // ↑ 旋转
+tap(34, 756); // ←
+tap(122, 756); // →
 step(5, '方向键点按');
 
 console.log('== 长按 → 连发（DAS） ==');
-touch.start({ touches: [{ identifier: 3, clientX: 127, clientY: 776 }] });
-busy(250); // 超过 180ms DAS 延迟
+touch.start({ touches: [{ identifier: 3, clientX: 122, clientY: 756 }] });
+busy(250);
 step(6, '长按 6 帧（应连发数次）');
-touch.end({ touches: [], changedTouches: [{ identifier: 3, clientX: 127, clientY: 776 }] });
+touch.end({ touches: [], changedTouches: [{ identifier: 3, clientX: 122, clientY: 756 }] });
 
 console.log('== 滑动切换臂（← 滑到 ↓） ==');
-touch.start({ touches: [{ identifier: 2, clientX: 33, clientY: 776 }] });
-touch.move({ touches: [{ identifier: 2, clientX: 80, clientY: 820 }] });
+touch.start({ touches: [{ identifier: 2, clientX: 34, clientY: 756 }] });
+touch.move({ touches: [{ identifier: 2, clientX: 78, clientY: 800 }] });
 step(2, '滑到 ↓');
-touch.end({ touches: [], changedTouches: [{ identifier: 2, clientX: 80, clientY: 820 }] });
-busy(320); // 让双击窗口过期：滑动不算「点按」
+touch.end({ touches: [], changedTouches: [{ identifier: 2, clientX: 78, clientY: 800 }] });
+busy(320); // 让双击窗口过期
 
 console.log('== 单击 ↓ 只软降、连按两下 ↓ 硬降 ==');
 mark = vibes.length;
-tap(80, 820); // 第一次点按 → 仅软降
+tap(78, 800);
 assert(!vibesSince(mark).includes('light'), '单击↓ 不应触发硬降');
 console.log('  单击↓ 仅软降 ✔');
-tap(80, 820); // 280ms 内第二次快速点按 → 硬降
+tap(78, 800);
 assert(vibesSince(mark).includes('light'), '连按两下↓ 应触发硬降');
 console.log('  连按两下↓ 硬降 ✔');
 step(30, '硬降后帧（覆盖锁定/消行渲染）');
 
-console.log('== 开始键暂停 / 浮层换边 / 恢复 ==');
-tap(216, 793); // 开始 → 暂停
+console.log('== 暂停 / 浮层换边 / 恢复 ==');
+tap(205, 756); // 左手暂停键
 step(3, 'paused 浮层');
-tap(216, 759); // 浮层上的选择键 → 换到右手（布局镜像）
-tap(195, 500); // 任意处恢复
+tap(195, 435); // 浮层换边键 → 右手
+tap(195, 500); // 恢复（右手布局）
 step(3, '恢复 playing（右手布局）');
-tap(166, 793); // 右手布局的开始键 → 暂停
+tap(174, 756); // 右手暂停键 → 暂停
 step(2, '再次暂停');
 tap(195, 500); // 恢复
-tap(166, 759); // 右手布局的选择键 → 换回左手
+tap(244, 74); // 顶部换边键 → 换回左
 step(3, '换回左手');
 assert(stored['tetris3d_dpad_side'] === 'left', '最终布局应为 left');
 

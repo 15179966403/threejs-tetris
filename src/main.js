@@ -210,6 +210,12 @@ window.addEventListener('keydown', (e) => {
     case 'ArrowUp': case 'KeyX': game.rotate(1); e.preventDefault(); break;
     case 'KeyZ': game.rotate(-1); e.preventDefault(); break;
     case 'Space': game.hardDrop(); e.preventDefault(); break;
+    case 'KeyG': case 'Digit1':
+      if (game.items && game.items.length) {
+        game.useGravity('cols', 4, 'down');
+      }
+      e.preventDefault();
+      break;
   }
 });
 

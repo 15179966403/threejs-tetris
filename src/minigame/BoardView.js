@@ -199,6 +199,31 @@ export class BoardView {
         this.particles.burst(x, y, 0xfbbf24, 8, 1.2);
         this.particles.burst(x, y, 0xa78bfa, 5, 0.9);
         this.shake = Math.min(0.25, this.shake + 0.08);
+      } else if (ev.type === 'gravity_pulse') {
+        // 重力释放：强烈的重力波震屏与粒子倾泻
+        this.shake = Math.min(0.45, this.shake + 0.28);
+        if (ev.mode === 'cols') {
+          for (const c of [ev.startIdx, ev.startIdx + 1]) {
+            for (let r = 0; r < ROWS; r += 2) {
+              const [x, y] = cellToWorld(r, c);
+              this.particles.burst(x, y, 0x22d3ee, 3, 1.2);
+              this.particles.burst(x, y, 0xfacc15, 2, 0.8);
+            }
+          }
+        } else {
+          for (const r of [ev.startIdx, ev.startIdx + 1]) {
+            for (let c = 0; c < COLS; c += 2) {
+              const [x, y] = cellToWorld(r, c);
+              this.particles.burst(x, y, 0x22d3ee, 3, 1.2);
+              this.particles.burst(x, y, 0xfacc15, 2, 0.8);
+            }
+          }
+        }
+      } else if (ev.type === 'item_gain') {
+        // 获得道具：屏幕中央金色与青色星芒
+        this.particles.burst(0, 0, 0xfacc15, 12, 1.5);
+        this.particles.burst(0, 0, 0x22d3ee, 8, 1.1);
+        this.shake = Math.min(0.2, this.shake + 0.06);
       }
     }
     events.length = 0;

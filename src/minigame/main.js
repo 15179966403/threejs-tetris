@@ -187,6 +187,22 @@ const actions = {
     }
     ui.dirty = true;
   },
+  useGravity: (mode, startIdx, dir) => {
+    if (inPlay()) {
+      const ok = game.useGravity(mode, startIdx, dir);
+      if (ok) vibrate('medium');
+      ui.dirty = true;
+    }
+  },
+  clickSlot: (slotIdx) => {
+    if (inPlay() && game.items && game.items[slotIdx]) {
+      const it = game.items[slotIdx];
+      if (it.type === 'gravity') {
+        ui.startTargeting(slotIdx);
+        vibrate('light');
+      }
+    }
+  },
 };
 const input = new Input(ui, actions);
 
@@ -242,7 +258,10 @@ function tick() {
   adapter.onFrame(rawDt);
   const dt = Math.min(rawDt, 0.05); // 防止切后台后 dt 过大
   input.update(dt);
-  game.update(dt);
+  // 处于重力道具选取模式时暂停方块自然下落，方便玩家瞄准
+  if (!ui.targeting || !ui.targeting.active) {
+    game.update(dt);
+  }
   view.sync(game, dt);
 
   // 震屏：特效强度驱动的相机抖动，指数衰减

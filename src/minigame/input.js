@@ -107,7 +107,57 @@ export class Input {
       return;
     }
 
+    // 道具目标选取模式下的触控分发
+    if (this.ui.targeting && this.ui.targeting.active) {
+      const tgt = this.ui.targeting;
+      const hit = this.ui.hitControl(x, y);
+      if (hit === 'targetColTab') {
+        tgt.mode = 'cols';
+        tgt.startIdx = Math.min(8, tgt.startIdx);
+        this.ui.dirty = true;
+        return;
+      }
+      if (hit === 'targetRowTab') {
+        tgt.mode = 'rows';
+        tgt.startIdx = Math.min(18, tgt.startIdx);
+        this.ui.dirty = true;
+        return;
+      }
+      if (hit === 'targetPrev') {
+        tgt.startIdx = Math.max(0, tgt.startIdx - 1);
+        this.ui.dirty = true;
+        return;
+      }
+      if (hit === 'targetNext') {
+        const max = tgt.mode === 'cols' ? 8 : 18;
+        tgt.startIdx = Math.min(max, tgt.startIdx + 1);
+        this.ui.dirty = true;
+        return;
+      }
+      if (hit === 'targetConfirm') {
+        this.a.useGravity(tgt.mode, tgt.startIdx, tgt.dir);
+        this.ui.cancelTargeting();
+        return;
+      }
+      if (hit === 'targetCancel') {
+        this.ui.cancelTargeting();
+        return;
+      }
+      if (hit === 'boardArea') {
+        this._updateTargetByCoords(x, y);
+        return;
+      }
+      return;
+    }
+
     const hit = this.ui.hitControl(x, y);
+
+    // 点击道具槽位
+    if (hit && hit.startsWith('slot_')) {
+      const idx = parseInt(hit.split('_')[1], 10);
+      this.a.clickSlot(idx);
+      return;
+    }
 
     // 游戏中：顶部切换左右手
     if (hit === 'swapTop') {
@@ -132,6 +182,11 @@ export class Input {
   }
 
   _onMove(e) {
+    if (this.ui.targeting && this.ui.targeting.active) {
+      const t = e.touches[0];
+      if (t) this._updateTargetByCoords(t.clientX, t.clientY);
+      return;
+    }
     const g = this.dpadTouch;
     if (!g) return;
     const t = e.touches.find((tt) => tt.identifier === g.id) || e.touches[0];
@@ -146,6 +201,27 @@ export class Input {
       this._release();
       this._press(hit, g.id);
     }
+  }
+
+  _updateTargetByCoords(x, y) {
+    const tgt = this.ui.targeting;
+    if (!tgt || !tgt.active) return;
+    const { W, top, deckY } = this.ui;
+    const bTop = top + 80;
+    const bH = deckY - bTop - 12;
+    const cellH = bH / 20;
+    const bW = cellH * 10;
+    const bLeft = (W - bW) / 2;
+    const cellW = bW / 10;
+
+    if (tgt.mode === 'cols') {
+      const c = Math.floor((x - bLeft) / cellW);
+      tgt.startIdx = Math.max(0, Math.min(8, c));
+    } else {
+      const r = Math.floor((y - bTop) / cellH);
+      tgt.startIdx = Math.max(0, Math.min(18, r));
+    }
+    this.ui.dirty = true;
   }
 
   _onEnd(e) {

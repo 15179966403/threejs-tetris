@@ -115,7 +115,8 @@ export class ModalView {
       c.font = `700 11px ${FONT}`;
       c.fillStyle = '#ffffff';
       c.textAlign = 'center';
-      c.fillText('⚙️ 设置', setX + setW / 2, setY + setH / 2 + 3.5);
+      c.textBaseline = 'middle';
+      c.fillText('⚙️ 设置', setX + setW / 2, setY + setH / 2);
     } else {
       const homeW = 84;
       const homeH = 24;
@@ -132,9 +133,11 @@ export class ModalView {
       c.font = `700 11px ${FONT}`;
       c.fillStyle = '#ffffff';
       c.textAlign = 'center';
-      c.fillText('🏠 首页', homeX + homeW / 2, homeY + homeH / 2 + 3.5);
+      c.textBaseline = 'middle';
+      c.fillText('🏠 首页', homeX + homeW / 2, homeY + homeH / 2);
     }
 
+    c.textBaseline = 'alphabetic';
     c.font = `12px ${FONT}`;
     c.fillStyle = '#9fb0d8';
     let swY = py + 160;
@@ -154,7 +157,7 @@ export class ModalView {
       // 1. 特技模式 Tab
       drawRoundRect(c, px + 24, tabY, tabW, tabH, 7);
       if (!isClassic) {
-        c.fillStyle = 'rgba(34, 211, 238, 0.25)';
+        c.fillStyle = 'rgba(2, 132, 199, 0.55)';
         c.fill();
         c.strokeStyle = '#00f2fe';
         c.lineWidth = 1.5;
@@ -163,23 +166,25 @@ export class ModalView {
         c.stroke();
         c.shadowBlur = 0;
         c.font = `700 12px ${FONT}`;
-        c.fillStyle = '#00f2fe';
+        c.fillStyle = '#ffffff';
       } else {
-        c.fillStyle = 'rgba(15, 22, 48, 0.65)';
+        c.fillStyle = 'rgba(15, 22, 48, 0.75)';
         c.fill();
-        c.strokeStyle = 'rgba(120, 140, 255, 0.25)';
+        c.strokeStyle = 'rgba(120, 140, 255, 0.35)';
         c.lineWidth = 1;
         c.stroke();
         c.font = `700 12px ${FONT}`;
-        c.fillStyle = '#94a3b8';
+        c.fillStyle = '#cbd5e1';
       }
-      c.fillText('⚡ 特技模式', px + 24 + tabW / 2, tabY + tabH / 2 + 4);
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText('特技模式', px + 24 + tabW / 2, tabY + tabH / 2);
 
       // 2. 经典模式 Tab
       const clX = px + 24 + tabW + 10;
       drawRoundRect(c, clX, tabY, tabW, tabH, 7);
       if (isClassic) {
-        c.fillStyle = 'rgba(34, 211, 238, 0.25)';
+        c.fillStyle = 'rgba(2, 132, 199, 0.55)';
         c.fill();
         c.strokeStyle = '#00f2fe';
         c.lineWidth = 1.5;
@@ -188,21 +193,25 @@ export class ModalView {
         c.stroke();
         c.shadowBlur = 0;
         c.font = `700 12px ${FONT}`;
-        c.fillStyle = '#00f2fe';
+        c.fillStyle = '#ffffff';
       } else {
-        c.fillStyle = 'rgba(15, 22, 48, 0.65)';
+        c.fillStyle = 'rgba(15, 22, 48, 0.75)';
         c.fill();
-        c.strokeStyle = 'rgba(120, 140, 255, 0.25)';
+        c.strokeStyle = 'rgba(120, 140, 255, 0.35)';
         c.lineWidth = 1;
         c.stroke();
         c.font = `700 12px ${FONT}`;
-        c.fillStyle = '#94a3b8';
+        c.fillStyle = '#cbd5e1';
       }
-      c.fillText('🧱 经典纯净', clX + tabW / 2, tabY + tabH / 2 + 4);
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText('经典纯净', clX + tabW / 2, tabY + tabH / 2);
+
+      c.textBaseline = 'alphabetic';
 
       // 模式特色介绍与最高分
       c.font = `500 11px ${FONT}`;
-      c.fillStyle = '#94a3b8';
+      c.fillStyle = '#cbd5e1';
       if (isClassic) {
         c.fillText('纯粹方块消除 · 经典速度考验 · 无特殊格', W / 2, py + 120);
         c.font = `700 11px ${FONT}`;
@@ -216,6 +225,7 @@ export class ModalView {
       }
       swY = py + 158;
     } else if (state === 'paused') {
+      c.textBaseline = 'alphabetic';
       const modeLabel = game.mode === 'classic' ? '经典纯净模式' : '特技模式';
       c.font = `700 13px ${FONT}`;
       c.fillStyle = '#f1f5f9';
@@ -225,6 +235,7 @@ export class ModalView {
       c.fillText(`当前得分  ${game.score}   |   消除行数  ${game.lines}`, W / 2, py + 104);
       swY = py + 120;
     } else {
+      c.textBaseline = 'alphabetic';
       c.font = `700 24px ${FONT}`;
       c.fillStyle = '#00f2fe';
       c.shadowColor = '#00f2fe';
@@ -249,30 +260,37 @@ export class ModalView {
     const swX = px + (pw - swW) / 2;
 
     if (state === 'gameover') {
-      // 结算状态：一键分享战绩给微信好友/群（鲜明翡翠绿，超高对比深色文字）
+      // 结算状态：一键分享战绩给微信好友/群（鲜明翡翠绿，超高对比白色文字）
       controlsOut.btnShare = { x: swX, y: swY, w: swW, h: swH };
-      const sGrad = c.createLinearGradient(swX, swY, swX + swW, swY + swH);
-      sGrad.addColorStop(0, '#34d399');
-      sGrad.addColorStop(1, '#06b6d4');
+      const sGrad = c.createLinearGradient(swX, swY, swX, swY + swH);
+      sGrad.addColorStop(0, '#059669');
+      sGrad.addColorStop(1, '#047857');
       drawRoundRect(c, swX, swY, swW, swH, swH / 2);
       c.fillStyle = sGrad;
       c.fill();
-      c.strokeStyle = '#10b981';
+      c.strokeStyle = '#34d399';
       c.lineWidth = 1.5;
+      c.shadowColor = '#34d399';
+      c.shadowBlur = 6;
       c.stroke();
+      c.shadowBlur = 0;
 
       // 顶部高光弧线
       c.beginPath();
-      c.moveTo(swX + 16, swY + 1);
-      c.lineTo(swX + swW - 16, swY + 1);
-      c.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      c.moveTo(swX + 16, swY + 1.2);
+      c.lineTo(swX + swW - 16, swY + 1.2);
+      c.strokeStyle = 'rgba(255, 255, 255, 0.45)';
       c.lineWidth = 1;
       c.stroke();
 
       c.font = `700 13px ${FONT}`;
-      c.fillStyle = '#02121a'; // 必须是极深墨绿/纯黑，对比度极高
+      c.fillStyle = '#ffffff';
       c.textAlign = 'center';
-      c.fillText('📤 分享战绩给好友', swX + swW / 2, swY + swH / 2 + 4.5);
+      c.textBaseline = 'middle';
+      c.shadowColor = 'rgba(0, 0, 0, 0.7)';
+      c.shadowBlur = 4;
+      c.fillText('分享战绩给好友', swX + swW / 2, swY + swH / 2);
+      c.shadowBlur = 0;
     } else {
       // 模式切换快捷按键（ready / paused 状态保持原样）
       controlsOut.swapOverlay = { x: swX, y: swY, w: swW, h: swH };
@@ -284,32 +302,41 @@ export class ModalView {
       });
 
       c.font = `700 12px ${FONT}`;
-      c.fillStyle = '#f1f5f9';
+      c.fillStyle = '#ffffff';
       c.textAlign = 'center';
+      c.textBaseline = 'middle';
       const modeText =
         side === 'dual'
-          ? '🎮 操作布局：双手 (点击切换)'
+          ? '操作布局：双手 (点击切换)'
           : side === 'right'
-            ? '👉 操作布局：右手 (点击切换)'
-            : '👈 操作布局：左手 (点击切换)';
-      c.fillText(modeText, swX + swW / 2, swY + swH / 2 + 4);
+            ? '操作布局：右手 (点击切换)'
+            : '操作布局：左手 (点击切换)';
+      c.fillText(modeText, swX + swW / 2, swY + swH / 2);
     }
 
-    // 主操作按钮（鲜明亮蓝渐变底盘 + 极深纯粹高对比文字，彻底杜绝发白看不清）
+    // 主操作按钮（深邃科技蓝渐变 + 霓虹青边框 + 纯白高对比立体文字，绝对醒目清晰）
     const bw = 184;
     const bh = 44;
     const bx = (W - bw) / 2;
     const by = py + ph - bh - 20;
     controlsOut.primary = { x: bx, y: by, w: bw, h: bh };
 
-    const grad = c.createLinearGradient(bx, by, bx + bw, by + bh);
-    grad.addColorStop(0, '#22d3ee');
-    grad.addColorStop(1, '#38bdf8');
+    const grad = c.createLinearGradient(bx, by, bx, by + bh);
+    grad.addColorStop(0, '#0284c7');
+    grad.addColorStop(1, '#1d4ed8');
     drawRoundRect(c, bx, by, bw, bh, 10);
     c.fillStyle = grad;
-    c.shadowColor = 'rgba(34, 211, 238, 0.45)';
+    c.shadowColor = 'rgba(0, 242, 254, 0.45)';
     c.shadowBlur = 10;
     c.fill();
+    c.shadowBlur = 0;
+
+    // 霓虹发光边框
+    c.strokeStyle = '#00f2fe';
+    c.lineWidth = 1.8;
+    c.shadowColor = '#00f2fe';
+    c.shadowBlur = 8;
+    c.stroke();
     c.shadowBlur = 0;
 
     // 顶部反光高光细线
@@ -320,12 +347,18 @@ export class ModalView {
     c.lineWidth = 1;
     c.stroke();
 
-    c.fillStyle = '#020b18'; // 极深邃的暗夜墨黑文字，在亮青底盘上格外醒目清晰
+    // 纯白清晰文字（带柔和阴影，确保在任何屏幕上都100%清晰突出）
+    c.fillStyle = '#ffffff';
     c.font = `700 16px ${FONT}`;
     c.textAlign = 'center';
-    const primaryLabel = state === 'ready' ? '▶  开 始 游 戏' : state === 'paused' ? '▶  继 续 游 戏' : '↺  再 来 一 局';
-    c.fillText(primaryLabel, W / 2, by + 28);
+    c.textBaseline = 'middle';
+    c.shadowColor = 'rgba(0, 0, 0, 0.85)';
+    c.shadowBlur = 4;
+    const primaryLabel = state === 'ready' ? '开始游戏' : state === 'paused' ? '继续游戏' : '再来一局';
+    c.fillText(primaryLabel, bx + bw / 2, by + bh / 2);
     c.shadowBlur = 0;
+
+    c.textBaseline = 'alphabetic';
 
     // 适龄提示规范：CADPA 8+ 标志（首屏合规要求）
     if (state === 'ready') {
@@ -400,16 +433,18 @@ export class ModalView {
       }
 
       c.font = `700 11px ${FONT}`;
-      c.fillStyle = active ? '#ffffff' : '#94a3b8';
+      c.fillStyle = active ? '#ffffff' : '#cbd5e1';
       c.textAlign = 'center';
-      c.fillText(m.label, m.x + segW / 2, segY + segH / 2 + 4);
+      c.textBaseline = 'middle';
+      c.fillText(m.label, m.x + segW / 2, segY + segH / 2);
     }
 
     // 2. 触感震动反馈开关
     const vibeY = py + 126;
+    c.textBaseline = 'alphabetic';
     c.textAlign = 'left';
     c.font = `700 12px ${FONT}`;
-    c.fillStyle = '#94a3b8';
+    c.fillStyle = '#cbd5e1';
     c.fillText('触感震动反馈', px + 24, vibeY + 18);
 
     const toggleBtnW = 88;
@@ -425,15 +460,17 @@ export class ModalView {
     });
 
     c.font = `700 11px ${FONT}`;
-    c.fillStyle = vibeOn ? '#ffffff' : '#64748b';
+    c.fillStyle = vibeOn ? '#ffffff' : '#94a3b8';
     c.textAlign = 'center';
-    c.fillText(vibeOn ? '📳 已开启' : '关闭', toggleBtnX + toggleBtnW / 2, vibeY + toggleBtnH / 2 + 3.5);
+    c.textBaseline = 'middle';
+    c.fillText(vibeOn ? '📳 已开启' : '关闭', toggleBtnX + toggleBtnW / 2, vibeY + toggleBtnH / 2);
 
     // 3. 音效声音反馈开关
     const sfxY = py + 168;
+    c.textBaseline = 'alphabetic';
     c.textAlign = 'left';
     c.font = `700 12px ${FONT}`;
-    c.fillStyle = '#94a3b8';
+    c.fillStyle = '#cbd5e1';
     c.fillText('音效声音反馈', px + 24, sfxY + 18);
 
     controlsOut.settingSfx = { x: toggleBtnX, y: sfxY, w: toggleBtnW, h: toggleBtnH };
@@ -446,9 +483,10 @@ export class ModalView {
     });
 
     c.font = `700 11px ${FONT}`;
-    c.fillStyle = sfxOn ? '#ffffff' : '#64748b';
+    c.fillStyle = sfxOn ? '#ffffff' : '#94a3b8';
     c.textAlign = 'center';
-    c.fillText(sfxOn ? '🔊 已开启' : '🔇 静音', toggleBtnX + toggleBtnW / 2, sfxY + toggleBtnH / 2 + 3.5);
+    c.textBaseline = 'middle';
+    c.fillText(sfxOn ? '🔊 已开启' : '🔇 静音', toggleBtnX + toggleBtnW / 2, sfxY + toggleBtnH / 2);
 
     // 4. 关闭/确定按钮
     const okW = 160;
@@ -458,25 +496,37 @@ export class ModalView {
     controlsOut.settingsClose = { x: okX, y: okY, w: okW, h: okH };
 
     const grad = c.createLinearGradient(okX, okY, okX + okW, okY + okH);
-    grad.addColorStop(0, '#22d3ee');
-    grad.addColorStop(1, '#38bdf8');
+    grad.addColorStop(0, '#0284c7');
+    grad.addColorStop(1, '#1d4ed8');
     drawRoundRect(c, okX, okY, okW, okH, 9);
     c.fillStyle = grad;
-    c.shadowColor = 'rgba(34, 211, 238, 0.45)';
+    c.shadowColor = 'rgba(0, 242, 254, 0.45)';
     c.shadowBlur = 10;
     c.fill();
     c.shadowBlur = 0;
 
+    c.strokeStyle = '#00f2fe';
+    c.lineWidth = 1.5;
+    c.shadowColor = '#00f2fe';
+    c.shadowBlur = 6;
+    c.stroke();
+    c.shadowBlur = 0;
+
     c.beginPath();
-    c.moveTo(okX + 10, okY + 1);
-    c.lineTo(okX + okW - 10, okY + 1);
-    c.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    c.moveTo(okX + 10, okY + 1.2);
+    c.lineTo(okX + okW - 10, okY + 1.2);
+    c.strokeStyle = 'rgba(255, 255, 255, 0.5)';
     c.lineWidth = 1;
     c.stroke();
 
-    c.fillStyle = '#020b18';
+    c.fillStyle = '#ffffff';
     c.font = `700 15px ${FONT}`;
     c.textAlign = 'center';
-    c.fillText('确 定', okX + okW / 2, okY + okH / 2 + 4.5);
+    c.textBaseline = 'middle';
+    c.shadowColor = 'rgba(0, 0, 0, 0.85)';
+    c.shadowBlur = 4;
+    c.fillText('确 定', okX + okW / 2, okY + okH / 2);
+    c.shadowBlur = 0;
+    c.textBaseline = 'alphabetic';
   }
 }

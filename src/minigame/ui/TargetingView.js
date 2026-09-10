@@ -145,27 +145,39 @@ export class TargetingView {
     const ok = controls.targetConfirm;
     const cancel = controls.targetCancel;
 
-    // 确认释放（鲜明亮青渐变底盘 + 极深纯粹墨黑文字，清晰夺目）
+    // 确认释放（深邃皇家蓝底盘 + 霓虹发光边框 + 纯白文字）
     const okGrad = c.createLinearGradient(ok.x, ok.y, ok.x + ok.w, ok.y + ok.h);
-    okGrad.addColorStop(0, '#22d3ee');
-    okGrad.addColorStop(1, '#38bdf8');
+    okGrad.addColorStop(0, '#0284c7');
+    okGrad.addColorStop(1, '#1d4ed8');
     drawRoundRect(c, ok.x, ok.y, ok.w, ok.h, 9);
     c.fillStyle = okGrad;
-    c.shadowColor = 'rgba(34, 211, 238, 0.45)';
+    c.shadowColor = 'rgba(0, 242, 254, 0.45)';
     c.shadowBlur = 10;
     c.fill();
     c.shadowBlur = 0;
 
+    c.strokeStyle = '#00f2fe';
+    c.lineWidth = 1.5;
+    c.shadowColor = '#00f2fe';
+    c.shadowBlur = 6;
+    c.stroke();
+    c.shadowBlur = 0;
+
     c.beginPath();
-    c.moveTo(ok.x + 8, ok.y + 1);
-    c.lineTo(ok.x + ok.w - 8, ok.y + 1);
-    c.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    c.moveTo(ok.x + 8, ok.y + 1.2);
+    c.lineTo(ok.x + ok.w - 8, ok.y + 1.2);
+    c.strokeStyle = 'rgba(255, 255, 255, 0.5)';
     c.lineWidth = 1;
     c.stroke();
 
-    c.fillStyle = '#020b18';
+    c.fillStyle = '#ffffff';
     c.font = `700 13px ${FONT}`;
-    c.fillText('⤓ 确认释放重力', ok.x + ok.w / 2, ok.y + ok.h / 2 + 4.5);
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.shadowColor = 'rgba(0, 0, 0, 0.85)';
+    c.shadowBlur = 4;
+    c.fillText('⤓ 确认释放重力', ok.x + ok.w / 2, ok.y + ok.h / 2);
+    c.shadowBlur = 0;
 
     // 取消按钮
     drawRoundRect(c, cancel.x, cancel.y, cancel.w, cancel.h, 9);
@@ -174,10 +186,13 @@ export class TargetingView {
     c.strokeStyle = 'rgba(120, 160, 255, 0.35)';
     c.lineWidth = 1;
     c.stroke();
-    c.fillStyle = '#f1f5f9';
+    c.fillStyle = '#ffffff';
     c.font = `700 12px ${FONT}`;
-    c.fillText('✖ 取消', cancel.x + cancel.w / 2, cancel.y + cancel.h / 2 + 4);
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('✖ 取消', cancel.x + cancel.w / 2, cancel.y + cancel.h / 2);
     c.textAlign = 'left';
+    c.textBaseline = 'alphabetic';
   }
 
   drawHighlight(ctx, W, top, deckY, targeting) {

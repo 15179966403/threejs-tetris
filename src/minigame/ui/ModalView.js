@@ -100,41 +100,55 @@ export class ModalView {
 
     // 右上角辅助胶囊按键（首页显示设置，暂停/结算显示返回首页）
     if (state === 'ready') {
-      const setW = 84;
-      const setH = 24;
+      const setW = 76;
+      const setH = 26;
       const setX = px + pw - setW - 14;
       const setY = py + 14;
       controlsOut.btnSettings = { x: setX, y: setY, w: setW, h: setH };
 
-      drawPanel(c, setX, setY, setW, setH, setH / 2, {
-        bgTop: 'rgba(25, 35, 75, 0.85)',
-        bgBot: 'rgba(12, 18, 42, 0.92)',
-        border: 'rgba(120, 160, 255, 0.4)',
-      });
+      drawRoundRect(c, setX, setY, setW, setH, setH / 2);
+      c.fillStyle = 'rgba(2, 132, 199, 0.40)';
+      c.fill();
+      c.strokeStyle = '#00f2fe';
+      c.lineWidth = 1.4;
+      c.shadowColor = '#00f2fe';
+      c.shadowBlur = 6;
+      c.stroke();
+      c.shadowBlur = 0;
 
-      c.font = `700 11px ${FONT}`;
+      c.font = `700 12px ${FONT}`;
       c.fillStyle = '#ffffff';
       c.textAlign = 'center';
       c.textBaseline = 'middle';
-      c.fillText('⚙️ 设置', setX + setW / 2, setY + setH / 2);
+      c.shadowColor = 'rgba(0, 0, 0, 0.85)';
+      c.shadowBlur = 4;
+      c.fillText('设 置', setX + setW / 2, setY + setH / 2);
+      c.shadowBlur = 0;
     } else {
-      const homeW = 84;
-      const homeH = 24;
+      const homeW = 76;
+      const homeH = 26;
       const homeX = px + pw - homeW - 14;
       const homeY = py + 14;
       controlsOut.btnHome = { x: homeX, y: homeY, w: homeW, h: homeH };
 
-      drawPanel(c, homeX, homeY, homeW, homeH, homeH / 2, {
-        bgTop: 'rgba(25, 35, 75, 0.85)',
-        bgBot: 'rgba(12, 18, 42, 0.92)',
-        border: 'rgba(120, 160, 255, 0.4)',
-      });
+      drawRoundRect(c, homeX, homeY, homeW, homeH, homeH / 2);
+      c.fillStyle = 'rgba(2, 132, 199, 0.40)';
+      c.fill();
+      c.strokeStyle = '#00f2fe';
+      c.lineWidth = 1.4;
+      c.shadowColor = '#00f2fe';
+      c.shadowBlur = 6;
+      c.stroke();
+      c.shadowBlur = 0;
 
-      c.font = `700 11px ${FONT}`;
+      c.font = `700 12px ${FONT}`;
       c.fillStyle = '#ffffff';
       c.textAlign = 'center';
       c.textBaseline = 'middle';
-      c.fillText('🏠 首页', homeX + homeW / 2, homeY + homeH / 2);
+      c.shadowColor = 'rgba(0, 0, 0, 0.85)';
+      c.shadowBlur = 4;
+      c.fillText('首 页', homeX + homeW / 2, homeY + homeH / 2);
+      c.shadowBlur = 0;
     }
 
     c.textBaseline = 'alphabetic';
@@ -216,12 +230,12 @@ export class ModalView {
         c.fillText('纯粹方块消除 · 经典速度考验 · 无特殊格', W / 2, py + 120);
         c.font = `700 11px ${FONT}`;
         c.fillStyle = '#facc15';
-        c.fillText(best > 0 ? `🏆 经典最高纪录  ${best}` : '🏆 纯粹竞技 · 冲击个人极限', W / 2, py + 138);
+        c.fillText(best > 0 ? `经典最高纪录  ${best}` : '纯粹竞技 · 冲击个人极限', W / 2, py + 138);
       } else {
         c.fillText('8向激光穿透 · 重力道具位移 · 刺激连锁', W / 2, py + 120);
         c.font = `700 11px ${FONT}`;
         c.fillStyle = '#facc15';
-        c.fillText(best > 0 ? `🏆 特技最高纪录  ${best}` : '🏆 消除箭头方块积攒重力能量', W / 2, py + 138);
+        c.fillText(best > 0 ? `特技最高纪录  ${best}` : '消除箭头方块积攒重力能量', W / 2, py + 138);
       }
       swY = py + 158;
     } else if (state === 'paused') {
@@ -250,12 +264,12 @@ export class ModalView {
 
       c.fillStyle = '#facc15';
       c.font = `700 12px ${FONT}`;
-      c.fillText(`🏆 历史最高纪录  ${Math.max(best, game.score)}`, W / 2, py + 142);
+      c.fillText(`历史最高纪录  ${Math.max(best, game.score)}`, W / 2, py + 142);
       swY = py + 164;
     }
 
     // 模式切换快捷按键与分享按钮尺寸基准
-    const swW = 200;
+    const swW = 206;
     const swH = 34;
     const swX = px + (pw - swW) / 2;
 
@@ -295,16 +309,31 @@ export class ModalView {
       // 模式切换快捷按键（ready / paused 状态保持原样）
       controlsOut.swapOverlay = { x: swX, y: swY, w: swW, h: swH };
 
-      drawPanel(c, swX, swY, swW, swH, swH / 2, {
-        bgTop: 'rgba(24, 34, 72, 0.85)',
-        bgBot: 'rgba(12, 18, 42, 0.92)',
-        border: 'rgba(120, 160, 255, 0.45)',
-      });
+      // 按钮底盘：科技深蓝 + 发光边框
+      drawRoundRect(c, swX, swY, swW, swH, swH / 2);
+      c.fillStyle = 'rgba(2, 132, 199, 0.35)';
+      c.fill();
+      c.strokeStyle = '#00f2fe';
+      c.lineWidth = 1.4;
+      c.shadowColor = '#00f2fe';
+      c.shadowBlur = 6;
+      c.stroke();
+      c.shadowBlur = 0;
+
+      // 顶部高光线
+      c.beginPath();
+      c.moveTo(swX + 16, swY + 1.2);
+      c.lineTo(swX + swW - 16, swY + 1.2);
+      c.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+      c.lineWidth = 1;
+      c.stroke();
 
       c.font = `700 12px ${FONT}`;
       c.fillStyle = '#ffffff';
       c.textAlign = 'center';
       c.textBaseline = 'middle';
+      c.shadowColor = 'rgba(0, 0, 0, 0.85)';
+      c.shadowBlur = 4;
       const modeText =
         side === 'dual'
           ? '操作布局：双手 (点击切换)'
@@ -312,6 +341,7 @@ export class ModalView {
             ? '操作布局：右手 (点击切换)'
             : '操作布局：左手 (点击切换)';
       c.fillText(modeText, swX + swW / 2, swY + swH / 2);
+      c.shadowBlur = 0;
     }
 
     // 主操作按钮（深邃科技蓝渐变 + 霓虹青边框 + 纯白高对比立体文字，绝对醒目清晰）
@@ -365,7 +395,8 @@ export class ModalView {
       c.font = `600 9px ${FONT}`;
       c.fillStyle = '#64748b';
       c.textAlign = 'center';
-      c.fillText('💚 CADPA 适龄提示 8+ | 适合8岁及以上用户', W / 2, py + ph - 6);
+      c.textBaseline = 'middle';
+      c.fillText('CADPA 适龄提示 8+ | 适合8岁及以上用户', W / 2, py + ph - 8);
     }
   }
 
@@ -387,12 +418,12 @@ export class ModalView {
     c.shadowBlur = 14;
     c.fillStyle = '#ffffff';
     c.font = `700 22px ${FONT}`;
-    c.fillText('⚙️ 游戏设置', W / 2, py + 38);
+    c.fillText('游戏设置', W / 2, py + 38);
     c.shadowBlur = 0;
 
     // 1. 操作模式分段选择器
     c.font = `700 12px ${FONT}`;
-    c.fillStyle = '#94a3b8';
+    c.fillStyle = '#cbd5e1';
     c.textAlign = 'left';
     c.fillText('操作布局模式', px + 24, py + 68);
 
@@ -401,9 +432,9 @@ export class ModalView {
     const segY = py + 78;
 
     const modes = [
-      { key: 'dual', label: '👐 双手', x: px + 24 },
-      { key: 'left', label: '👈 左手', x: px + 24 + segW + 8 },
-      { key: 'right', label: '👉 右手', x: px + 24 + (segW + 8) * 2 },
+      { key: 'dual', label: '双手持握', x: px + 24 },
+      { key: 'left', label: '左手单手', x: px + 24 + segW + 8 },
+      { key: 'right', label: '右手单手', x: px + 24 + (segW + 8) * 2 },
     ];
 
     controlsOut.settingModes = [];
@@ -436,7 +467,10 @@ export class ModalView {
       c.fillStyle = active ? '#ffffff' : '#cbd5e1';
       c.textAlign = 'center';
       c.textBaseline = 'middle';
+      c.shadowColor = 'rgba(0, 0, 0, 0.85)';
+      c.shadowBlur = 4;
       c.fillText(m.label, m.x + segW / 2, segY + segH / 2);
+      c.shadowBlur = 0;
     }
 
     // 2. 触感震动反馈开关
@@ -453,17 +487,26 @@ export class ModalView {
     controlsOut.settingVibe = { x: toggleBtnX, y: vibeY, w: toggleBtnW, h: toggleBtnH };
 
     const vibeOn = settings ? settings.vibrateEnabled !== false : true;
-    drawPanel(c, toggleBtnX, vibeY, toggleBtnW, toggleBtnH, toggleBtnH / 2, {
-      bgTop: vibeOn ? 'rgba(2, 132, 199, 0.45)' : 'rgba(15, 23, 48, 0.75)',
-      bgBot: vibeOn ? 'rgba(14, 165, 233, 0.25)' : 'rgba(10, 15, 34, 0.85)',
-      border: vibeOn ? '#00f2fe' : 'rgba(120, 160, 255, 0.28)',
-    });
+    drawRoundRect(c, toggleBtnX, vibeY, toggleBtnW, toggleBtnH, toggleBtnH / 2);
+    c.fillStyle = vibeOn ? 'rgba(2, 132, 199, 0.45)' : 'rgba(15, 23, 48, 0.75)';
+    c.fill();
+    c.strokeStyle = vibeOn ? '#00f2fe' : 'rgba(120, 160, 255, 0.28)';
+    c.lineWidth = 1.2;
+    if (vibeOn) {
+      c.shadowColor = '#00f2fe';
+      c.shadowBlur = 6;
+    }
+    c.stroke();
+    c.shadowBlur = 0;
 
-    c.font = `700 11px ${FONT}`;
+    c.font = `700 12px ${FONT}`;
     c.fillStyle = vibeOn ? '#ffffff' : '#94a3b8';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.fillText(vibeOn ? '📳 已开启' : '关闭', toggleBtnX + toggleBtnW / 2, vibeY + toggleBtnH / 2);
+    c.shadowColor = 'rgba(0, 0, 0, 0.85)';
+    c.shadowBlur = 4;
+    c.fillText(vibeOn ? '已开启' : '已关闭', toggleBtnX + toggleBtnW / 2, vibeY + toggleBtnH / 2);
+    c.shadowBlur = 0;
 
     // 3. 音效声音反馈开关
     const sfxY = py + 168;
@@ -476,17 +519,26 @@ export class ModalView {
     controlsOut.settingSfx = { x: toggleBtnX, y: sfxY, w: toggleBtnW, h: toggleBtnH };
 
     const sfxOn = settings ? settings.sfxEnabled !== false : true;
-    drawPanel(c, toggleBtnX, sfxY, toggleBtnW, toggleBtnH, toggleBtnH / 2, {
-      bgTop: sfxOn ? 'rgba(2, 132, 199, 0.45)' : 'rgba(15, 23, 48, 0.75)',
-      bgBot: sfxOn ? 'rgba(14, 165, 233, 0.25)' : 'rgba(10, 15, 34, 0.85)',
-      border: sfxOn ? '#00f2fe' : 'rgba(120, 160, 255, 0.28)',
-    });
+    drawRoundRect(c, toggleBtnX, sfxY, toggleBtnW, toggleBtnH, toggleBtnH / 2);
+    c.fillStyle = sfxOn ? 'rgba(2, 132, 199, 0.45)' : 'rgba(15, 23, 48, 0.75)';
+    c.fill();
+    c.strokeStyle = sfxOn ? '#00f2fe' : 'rgba(120, 160, 255, 0.28)';
+    c.lineWidth = 1.2;
+    if (sfxOn) {
+      c.shadowColor = '#00f2fe';
+      c.shadowBlur = 6;
+    }
+    c.stroke();
+    c.shadowBlur = 0;
 
-    c.font = `700 11px ${FONT}`;
+    c.font = `700 12px ${FONT}`;
     c.fillStyle = sfxOn ? '#ffffff' : '#94a3b8';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.fillText(sfxOn ? '🔊 已开启' : '🔇 静音', toggleBtnX + toggleBtnW / 2, sfxY + toggleBtnH / 2);
+    c.shadowColor = 'rgba(0, 0, 0, 0.85)';
+    c.shadowBlur = 4;
+    c.fillText(sfxOn ? '已开启' : '已静音', toggleBtnX + toggleBtnW / 2, sfxY + toggleBtnH / 2);
+    c.shadowBlur = 0;
 
     // 4. 关闭/确定按钮
     const okW = 160;

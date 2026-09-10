@@ -47,7 +47,7 @@ export class PropBarView {
       c.fillStyle = '#38bdf8';
       c.shadowColor = '#0284c7';
       c.shadowBlur = 6;
-      c.fillText('🧱 CLASSIC', p.x + p.w / 2, p.y + p.h / 2 - 4);
+      c.fillText('CLASSIC 纯粹', p.x + p.w / 2, p.y + p.h / 2 - 4);
       c.shadowBlur = 0;
 
       c.font = `600 9px ${FONT}`;
@@ -66,7 +66,7 @@ export class PropBarView {
     c.font = `700 9px ${FONT}`;
     c.fillStyle = isReady ? ACCENT_GOLD : ACCENT_CYAN;
     c.textAlign = 'left';
-    c.fillText(isReady ? '⚡ 能量就绪' : '⚡ 蓄能槽', p.x + 8, p.y + 15);
+    c.fillText(isReady ? '能量就绪' : '蓄能槽', p.x + 8, p.y + 15);
 
     c.textAlign = 'right';
     c.font = `700 9px ${FONT}`;

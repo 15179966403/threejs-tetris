@@ -134,9 +134,22 @@ export class Input {
           if (this.a.toggleVibrate) this.a.toggleVibrate();
           return;
         }
+        if (hit === 'settingSfx') {
+          if (this.a.toggleSfx) this.a.toggleSfx();
+          return;
+        }
         if (hit && hit.startsWith('settingMode_')) {
           const mode = hit.replace('settingMode_', '');
           if (this.a.setControlMode) this.a.setControlMode(mode);
+          return;
+        }
+        if (hit === 'btnSettings') {
+          if (this.a.openSettings) this.a.openSettings();
+          else this.ui.openSettings();
+          return;
+        }
+        if (hit === 'btnHome') {
+          if (this.a.returnHome) this.a.returnHome();
           return;
         }
         if (hit === 'swapOverlay' || hit === 'swapTop') {

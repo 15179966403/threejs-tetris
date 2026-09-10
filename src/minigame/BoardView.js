@@ -3,6 +3,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { COLS, ROWS, CELL, COLORS, CLEAR_TIME, FX_COLORS } from '../constants.js';
 import { FxMarkerPool, DecayMarkerPool, FX_ANGLE } from '../fxMarker.js';
 import { FxParticles, FxBeams } from '../fxParticles.js';
+import { audioService } from '../services/AudioService.js';
 
 /** 格子坐标 -> 世界坐标（棋盘中心为原点，行 0 在顶部） */
 function cellToWorld(row, col) {
@@ -174,6 +175,7 @@ export class BoardView {
         }
         this.shake = Math.min(0.3, this.shake + 0.15);
       } else if (ev.type === 'beam') {
+        audioService.playLaser();
         // 光束：从触发格贯穿到边界
         const stepsX =
           ev.dx > 0 ? COLS - 1 - ev.x : ev.dx < 0 ? ev.x : Infinity;
@@ -194,12 +196,14 @@ export class BoardView {
         }
         this.shake = Math.min(0.35, this.shake + 0.12);
       } else if (ev.type === 'decay') {
+        audioService.playDecay();
         // 倒计时方块销毁：金色与浅紫色碎裂火花
         const [x, y] = cellToWorld(ev.y, ev.x);
         this.particles.burst(x, y, 0xfbbf24, 8, 1.2);
         this.particles.burst(x, y, 0xa78bfa, 5, 0.9);
         this.shake = Math.min(0.25, this.shake + 0.08);
       } else if (ev.type === 'gravity_pulse') {
+        audioService.playGravity();
         // 重力释放：强烈的重力波震屏与粒子倾泻
         this.shake = Math.min(0.45, this.shake + 0.28);
         if (ev.mode === 'cols') {

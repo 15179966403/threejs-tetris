@@ -187,6 +187,7 @@ export class GameUI {
     if (this.modalView.isSettingsOpen) {
       if (inR(c.settingsClose)) return 'settingsClose';
       if (inR(c.settingVibe)) return 'settingVibe';
+      if (inR(c.settingSfx)) return 'settingSfx';
       if (c.settingModes) {
         for (let i = 0; i < c.settingModes.length; i++) {
           const m = c.settingModes[i];
@@ -228,6 +229,8 @@ export class GameUI {
     }
 
     // 3. 浮层非游戏状态
+    if (inR(c.btnSettings)) return 'btnSettings';
+    if (inR(c.btnHome)) return 'btnHome';
     if (inR(c.swapOverlay)) return 'swapOverlay';
     if (inR(c.swapTop)) return 'swapTop';
     if (inR(c.primary)) return 'primary';

@@ -6,6 +6,8 @@ import { GameUI } from './ui.js';
 import { Input } from './input.js';
 import { COLS, ROWS } from '../constants.js';
 import { settingsManager } from '../services/SettingsManager.js';
+import { audioService } from '../services/AudioService.js';
+import { sceneManager, SCENES } from '../services/SceneManager.js';
 
 /* global wx */
 
@@ -160,41 +162,79 @@ try {
 const inPlay = () => game.state === 'playing';
 const actions = {
   getState: () => game.state,
-  move: (d) => inPlay() && game.move(d, 0),
-  rotate: (d) => inPlay() && game.rotate(d),
-  softDrop: () => inPlay() && game.softDrop(),
+  move: (d) => {
+    const ok = inPlay() && game.move(d, 0);
+    if (ok) audioService.playMove();
+    return ok;
+  },
+  rotate: (d) => {
+    const ok = inPlay() && game.rotate(d);
+    if (ok) audioService.playRotate();
+    return ok;
+  },
+  softDrop: () => {
+    const ok = inPlay() && game.softDrop();
+    if (ok) audioService.playSoftDrop();
+    return ok;
+  },
   hardDrop: () => {
     if (inPlay()) {
       game.hardDrop();
       vibrate('light');
+      audioService.playHardDrop();
     }
   },
   pause: () => {
-    if (game.state === 'playing' || game.state === 'paused') game.togglePause();
+    if (game.state === 'playing' || game.state === 'paused') {
+      game.togglePause();
+      audioService.playUiClick();
+    }
   },
   swap: () => {
     settingsManager.cycleControlMode();
     vibrate('light');
+    audioService.playUiClick();
   },
   openSettings: () => {
     ui.openSettings();
+    audioService.playUiClick();
   },
   closeSettings: () => {
     ui.closeSettings();
+    audioService.playUiClick();
   },
   setControlMode: (mode) => {
     settingsManager.set('controlMode', mode);
     vibrate('light');
+    audioService.playUiClick();
   },
   toggleVibrate: () => {
     settingsManager.toggle('vibrateEnabled');
     vibrate('light');
+    audioService.playUiClick();
+  },
+  toggleSfx: () => {
+    settingsManager.toggle('sfxEnabled');
+    audioService.playUiClick();
+    ui.dirty = true;
+  },
+  returnHome: () => {
+    game.reset();
+    sceneManager.setScene(SCENES.TITLE);
+    audioService.playUiClick();
+    ui.dirty = true;
   },
   primary: () => {
-    if (game.state === 'ready') game.start();
-    else if (game.state === 'paused') game.togglePause();
-    else if (game.state === 'gameover') {
+    audioService.resume();
+    audioService.playUiClick();
+    if (game.state === 'ready') {
+      sceneManager.setScene(SCENES.GAME);
+      game.start();
+    } else if (game.state === 'paused') {
+      game.togglePause();
+    } else if (game.state === 'gameover') {
       game.reset();
+      sceneManager.setScene(SCENES.GAME);
       game.start();
     }
     ui.dirty = true;
@@ -202,7 +242,10 @@ const actions = {
   useGravity: (mode, startIdx, dir) => {
     if (inPlay()) {
       const ok = game.useGravity(mode, startIdx, dir);
-      if (ok) vibrate('medium');
+      if (ok) {
+        vibrate('medium');
+        audioService.playGravity();
+      }
       ui.dirty = true;
     }
   },
@@ -212,6 +255,7 @@ const actions = {
       if (it.type === 'gravity') {
         ui.startTargeting(slotIdx);
         vibrate('light');
+        audioService.playUiClick();
       }
     }
   },
@@ -288,12 +332,17 @@ function tick() {
   }
 
   if (game.state !== prevState) {
-    if (game.state === 'clearing') vibrate('medium');
-    if (game.state === 'gameover' && game.score > best) {
-      best = game.score;
-      try {
-        wx.setStorageSync('tetris3d_best', best);
-      } catch (e) { /* 忽略 */ }
+    if (game.state === 'clearing') {
+      vibrate('medium');
+      audioService.playClear(1, game.combo || 0);
+    } else if (game.state === 'gameover') {
+      audioService.playGameOver();
+      if (game.score > best) {
+        best = game.score;
+        try {
+          wx.setStorageSync('tetris3d_best', best);
+        } catch (e) { /* 忽略 */ }
+      }
     }
     prevState = game.state;
   }

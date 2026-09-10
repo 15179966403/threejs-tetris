@@ -66,8 +66,14 @@ export const TYPES = Object.keys(SHAPES);
 /** 4 行消行的基础得分，乘以当前等级 */
 export const LINE_SCORES = [0, 100, 300, 500, 800];
 
-/** 特殊方格出现概率（原 1.0 全体出现太高，降至约 1/3） */
+/** 初始（1级）特殊方格出现概率（原 1.0 全体出现太高，降至约 1/3） */
 export const SPECIAL_CHANCE = 0.35;
+
+/** 每升 1 级特殊方格生成概率增量（等级越高，特殊箭头方块越频繁） */
+export const SPECIAL_CHANCE_STEP = 0.05;
+
+/** 特殊方格最大生成概率上限（封顶 80%） */
+export const MAX_SPECIAL_CHANCE = 0.80;
 
 /** 特殊方格的 8 个方向：正交 = 直线激光清除，斜向 = 取反（有则消、无则加） */
 export const FX_TYPES = ['up', 'down', 'left', 'right', 'ne', 'nw', 'se', 'sw'];

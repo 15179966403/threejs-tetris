@@ -88,7 +88,7 @@ export class GameUI {
     this.targeting.active = true;
     this.targeting.itemIdx = itemIdx;
     this.targeting.mode = 'cols';
-    this.targeting.startIdx = 4;
+    this.targeting.startIdx = 3;
     this.targeting.dir = 'down';
     this.dirty = true;
   }
@@ -657,7 +657,7 @@ export class GameUI {
     c.fillStyle = isCols ? '#22d3ee' : MUTED;
     c.font = `600 12px ${FONT}`;
     c.textAlign = 'center';
-    c.fillText('↔ 选连续 2 列 (下落)', colTab.x + colTab.w / 2, colTab.y + colTab.h / 2 + 4);
+    c.fillText('↔ 选连续 3 列 (下落)', colTab.x + colTab.w / 2, colTab.y + colTab.h / 2 + 4);
 
     // 行选择 Tab
     this._rr(c, rowTab.x, rowTab.y, rowTab.w, rowTab.h, 8);
@@ -691,7 +691,7 @@ export class GameUI {
     c.fillText('▶', next.x + next.w / 2, next.y + next.h / 2 + 5);
 
     const desc = isCols
-      ? `已选第 ${tgt.startIdx + 1} - ${tgt.startIdx + 2} 列 (可点触棋盘)`
+      ? `已选第 ${tgt.startIdx + 1} - ${tgt.startIdx + 3} 列 (可点触棋盘)`
       : `已选第 ${tgt.startIdx + 1} - ${tgt.startIdx + 2} 行 (可点触棋盘)`;
     c.font = `600 12px ${FONT}`;
     c.fillStyle = '#38bdf8';
@@ -745,7 +745,7 @@ export class GameUI {
     c.save();
     if (isCols) {
       const x = bLeft + tgt.startIdx * cellW;
-      const w = cellW * 2;
+      const w = cellW * 3;
       const y = bTop;
       const h = bH;
 

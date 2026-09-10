@@ -203,7 +203,7 @@ export class BoardView {
         // 重力释放：强烈的重力波震屏与粒子倾泻
         this.shake = Math.min(0.45, this.shake + 0.28);
         if (ev.mode === 'cols') {
-          for (const c of [ev.startIdx, ev.startIdx + 1]) {
+          for (const c of [ev.startIdx, ev.startIdx + 1, ev.startIdx + 2]) {
             for (let r = 0; r < ROWS; r += 2) {
               const [x, y] = cellToWorld(r, c);
               this.particles.burst(x, y, 0x22d3ee, 3, 1.2);

@@ -443,17 +443,18 @@ const check = (name, cond) => {
   check('道具池上限封顶为 5 个', g.items.length === MAX_ITEMS);
 }
 
-// 16. 重力道具：连续 2 列向下物理位移压实
+// 16. 重力道具：连续 3 列向下物理位移压实
 {
   const g = new TetrisGame();
   g.start();
   // 赠送 1 个重力道具
   g.items.push({ id: 1, type: 'gravity', name: '重力', dir: 'down' });
 
-  // 在第 3 列和第 4 列悬空放置方块（底部 18/19 行全空）
+  // 在第 3 列、第 4 列、第 5 列悬空放置方块（底部 18/19 行全空）
   g.board[12][3] = { t: 'I', fx: null };
   g.board[15][3] = { t: 'T', fx: null };
   g.board[10][4] = { t: 'O', fx: null };
+  g.board[14][5] = { t: 'L', fx: null };
 
   const used = g.useGravity('cols', 3, 'down');
   check('成功使用重力道具', used === true);
@@ -462,6 +463,7 @@ const check = (name, cond) => {
   check('第 3 列较上的方块叠在第 18 行', g.board[18][3] && g.board[18][3].t === 'I');
   check('原悬空位置已清空', g.board[12][3] === null && g.board[15][3] === null);
   check('第 4 列方块落到最底第 19 行', g.board[19][4] && g.board[19][4].t === 'O');
+  check('第 5 列方块落到最底第 19 行（3列连续位移）', g.board[19][5] && g.board[19][5].t === 'L');
 }
 
 // 17. 重力道具：连续 2 行向下位移与位移后触发消行连锁
@@ -483,6 +485,25 @@ const check = (name, cond) => {
   check('成功使用连续两行重力', used === true);
   check('悬空方块下落填满第 19 行触发消行状态', g.state === 'clearing');
   check('消行包含第 19 行', g.clearingRows.includes(19));
+}
+
+// 18. 特殊箭头方块生成概率随等级提升机制
+{
+  const g = new TetrisGame();
+  check('1 级时初始特殊方块概率为 0.35', Math.abs(g.specialChance - 0.35) < 1e-6);
+
+  g.level = 2;
+  check('2 级时特殊方块概率提升为 0.40', Math.abs(g.specialChance - 0.40) < 1e-6);
+
+  g.level = 5;
+  check('5 级时特殊方块概率提升为 0.55', Math.abs(g.specialChance - 0.55) < 1e-6);
+
+  g.level = 15;
+  check('极高级别时特殊方块概率封顶在 0.80', Math.abs(g.specialChance - 0.80) < 1e-6);
+
+  const gDisabled = new TetrisGame({ specialChance: 0 });
+  gDisabled.level = 10;
+  check('显式关闭或覆盖特殊概率时不随等级改变', gDisabled.specialChance === 0);
 }
 
 console.log(failures === 0 ? '\n全部通过 ✔' : `\n${failures} 项失败 ✘`);

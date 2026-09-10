@@ -7,6 +7,8 @@ import {
   CLEAR_TIME,
   SETTLE_TIME,
   SPECIAL_CHANCE,
+  SPECIAL_CHANCE_STEP,
+  MAX_SPECIAL_CHANCE,
   FX_TYPES,
   LASER_CELL_SCORE,
   MAX_COMBO,
@@ -66,21 +68,33 @@ export class TetrisGame {
    *        测试/教学模式可传 0 关闭）
    */
   constructor(options = {}) {
-    this.specialChance = options.specialChance ?? SPECIAL_CHANCE;
+    this._specialChanceOverride = options.specialChance !== undefined ? options.specialChance : null;
     this.reset();
+  }
+
+  /** 当前特殊格生成概率：随等级递增，或优先使用显式覆盖设置 */
+  get specialChance() {
+    if (this._specialChanceOverride !== null && this._specialChanceOverride !== undefined) {
+      return this._specialChanceOverride;
+    }
+    return Math.min(MAX_SPECIAL_CHANCE, SPECIAL_CHANCE + (this.level - 1) * SPECIAL_CHANCE_STEP);
+  }
+
+  set specialChance(val) {
+    this._specialChanceOverride = val;
   }
 
   reset() {
     /** board[row][col]：null 为空，否则为 { t: 方块类型字母, fx: null | 'up' | 'down' } */
     this.board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
-    this.bag = [];
-    this.nextSpecial = null; // next 方块上的特殊格 { r, c, fx }（矩阵坐标）
-    this.nextType = this.#draw();
-    this.current = null; // { type, matrix, x, y, special }
     this.score = 0;
     this.lines = 0;
     this.level = 1;
     this.state = 'ready'; // ready | playing | clearing | paused | gameover
+    this.bag = [];
+    this.nextSpecial = null; // next 方块上的特殊格 { r, c, fx }（矩阵坐标）
+    this.nextType = this.#draw();
+    this.current = null; // { type, matrix, x, y, special }
     this.combo = 0; // 连锁波次（消行后由特殊格引发的额外消行轮数）
     this.dropTimer = 0;
     this.clearTimer = 0;
@@ -527,8 +541,8 @@ export class TetrisGame {
 
   /**
    * 使用重力道具
-   * @param {'rows' | 'cols'} mode 指定连续 2 行还是连续 2 列
-   * @param {number} startIdx 起始行号 (0 <= startIdx < ROWS - 1) 或起始列号 (0 <= startIdx < COLS - 1)
+   * @param {'rows' | 'cols'} mode 指定连续 2 行还是连续 3 列
+   * @param {number} startIdx 起始行号 (0 <= startIdx <= ROWS - 2) 或起始列号 (0 <= startIdx <= COLS - 3)
    * @param {'down' | 'up' | 'left' | 'right'} [dir='down'] 位移方向，默认向下
    * @returns {boolean} 是否成功使用
    */
@@ -537,11 +551,17 @@ export class TetrisGame {
     const itemIdx = this.items.findIndex((it) => it.type === 'gravity');
     if (itemIdx === -1) return false;
 
+    // 规范化起始坐标（列模式影响连续 3 列，行模式影响连续 2 行）
+    const safeStartIdx =
+      mode === 'cols'
+        ? Math.max(0, Math.min(COLS - 3, startIdx))
+        : Math.max(0, Math.min(ROWS - 2, startIdx));
+
     // 消耗该道具
     this.items.splice(itemIdx, 1);
 
     // 执行重力位移
-    this.#applyGravityShift(mode, startIdx, dir);
+    this.#applyGravityShift(mode, safeStartIdx, dir);
 
     // 同步校准 decayQueue
     this.#syncDecayQueue();
@@ -550,7 +570,7 @@ export class TetrisGame {
     this.fxEvents.push({
       type: 'gravity_pulse',
       mode,
-      startIdx,
+      startIdx: safeStartIdx,
       dir,
     });
 
@@ -588,12 +608,12 @@ export class TetrisGame {
     return true;
   }
 
-  /** 执行重力物理位移：连续 2 行或连续 2 列朝指定方向下落/滑动直到受阻 */
+  /** 执行重力物理位移：连续 2 行或连续 3 列朝指定方向下落/滑动直到受阻 */
   #applyGravityShift(mode, startIdx, dir = 'down') {
     if (mode === 'cols') {
-      const c1 = Math.max(0, Math.min(COLS - 2, startIdx));
-      const c2 = c1 + 1;
-      for (const c of [c1, c2]) {
+      const c1 = Math.max(0, Math.min(COLS - 3, startIdx));
+      const colsToShift = [c1, c1 + 1, c1 + 2];
+      for (const c of colsToShift) {
         if (dir === 'down') {
           // 自下而上压实下坠
           for (let r = ROWS - 2; r >= 0; r--) {

@@ -113,7 +113,7 @@ export class Input {
       const hit = this.ui.hitControl(x, y);
       if (hit === 'targetColTab') {
         tgt.mode = 'cols';
-        tgt.startIdx = Math.min(8, tgt.startIdx);
+        tgt.startIdx = Math.min(7, tgt.startIdx);
         this.ui.dirty = true;
         return;
       }
@@ -129,7 +129,7 @@ export class Input {
         return;
       }
       if (hit === 'targetNext') {
-        const max = tgt.mode === 'cols' ? 8 : 18;
+        const max = tgt.mode === 'cols' ? 7 : 18;
         tgt.startIdx = Math.min(max, tgt.startIdx + 1);
         this.ui.dirty = true;
         return;
@@ -216,7 +216,7 @@ export class Input {
 
     if (tgt.mode === 'cols') {
       const c = Math.floor((x - bLeft) / cellW);
-      tgt.startIdx = Math.max(0, Math.min(8, c));
+      tgt.startIdx = Math.max(0, Math.min(7, c));
     } else {
       const r = Math.floor((y - bTop) / cellH);
       tgt.startIdx = Math.max(0, Math.min(18, r));

@@ -212,7 +212,7 @@ window.addEventListener('keydown', (e) => {
     case 'Space': game.hardDrop(); e.preventDefault(); break;
     case 'KeyG': case 'Digit1':
       if (game.items && game.items.length) {
-        game.useGravity('cols', 4, 'down');
+        game.useGravity('cols', 3, 'down');
       }
       e.preventDefault();
       break;

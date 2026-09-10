@@ -114,7 +114,7 @@ function makeCtx2D() {
     {
       get(_, prop) {
         if (prop === 'measureText') return () => ({ width: 10 });
-        if (prop === 'createLinearGradient') return () => ({ addColorStop: noop });
+        if (prop === 'createLinearGradient' || prop === 'createRadialGradient') return () => ({ addColorStop: noop });
         if (prop === 'getImageData') return (x, y, w, h) => ({ data: new Uint8ClampedArray(w * h * 4) });
         if (prop in store) return store[prop];
         return noop;

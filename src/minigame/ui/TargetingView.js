@@ -37,15 +37,23 @@ export class TargetingView {
     const c = ctx;
     const tgt = targeting;
 
-    // 控制台半透明底板
-    c.fillStyle = 'rgba(9, 12, 24, 0.88)';
+    // 控制台半透明微质感底板
+    const deckGrad = c.createLinearGradient(0, deckY, 0, deckY + deckH);
+    deckGrad.addColorStop(0, 'rgba(14, 20, 44, 0.92)');
+    deckGrad.addColorStop(1, 'rgba(5, 7, 18, 0.98)');
+    c.fillStyle = deckGrad;
     c.fillRect(0, deckY, W, deckH);
-    c.strokeStyle = '#22d3ee';
+
+    // 顶部霓虹地平线
+    c.strokeStyle = '#00f2fe';
     c.lineWidth = 1.5;
+    c.shadowColor = '#00f2fe';
+    c.shadowBlur = 6;
     c.beginPath();
-    c.moveTo(0, deckY + 0.5);
-    c.lineTo(W, deckY + 0.5);
+    c.moveTo(0, deckY + 0.75);
+    c.lineTo(W, deckY + 0.75);
     c.stroke();
+    c.shadowBlur = 0;
 
     // 1. 模式切换 Tab
     const colTab = controls.targetColTab;
@@ -53,25 +61,54 @@ export class TargetingView {
     const isCols = tgt.mode === 'cols';
 
     // 列选择 Tab
-    drawRoundRect(c, colTab.x, colTab.y, colTab.w, colTab.h, 8);
-    c.fillStyle = isCols ? 'rgba(34, 211, 238, 0.25)' : 'rgba(20, 28, 55, 0.6)';
-    c.fill();
-    c.strokeStyle = isCols ? '#22d3ee' : BORDER;
-    c.lineWidth = isCols ? 1.5 : 1;
-    c.stroke();
-    c.fillStyle = isCols ? '#22d3ee' : '#7d8bb0';
-    c.font = `600 12px ${FONT}`;
+    drawRoundRect(c, colTab.x, colTab.y, colTab.w, colTab.h, 7);
+    if (isCols) {
+      const g = c.createLinearGradient(colTab.x, colTab.y, colTab.x + colTab.w, colTab.y + colTab.h);
+      g.addColorStop(0, 'rgba(2, 132, 199, 0.55)');
+      g.addColorStop(1, 'rgba(14, 165, 233, 0.35)');
+      c.fillStyle = g;
+      c.fill();
+      c.strokeStyle = '#00f2fe';
+      c.lineWidth = 1.5;
+      c.shadowColor = '#00f2fe';
+      c.shadowBlur = 6;
+      c.stroke();
+      c.shadowBlur = 0;
+    } else {
+      c.fillStyle = 'rgba(15, 23, 48, 0.65)';
+      c.fill();
+      c.strokeStyle = 'rgba(120, 160, 255, 0.25)';
+      c.lineWidth = 1;
+      c.stroke();
+    }
+    c.fillStyle = isCols ? '#ffffff' : '#94a3b8';
+    c.font = `700 12px ${FONT}`;
     c.textAlign = 'center';
     c.fillText('↔ 选连续 3 列 (下落)', colTab.x + colTab.w / 2, colTab.y + colTab.h / 2 + 4);
 
     // 行选择 Tab
-    drawRoundRect(c, rowTab.x, rowTab.y, rowTab.w, rowTab.h, 8);
-    c.fillStyle = !isCols ? 'rgba(34, 211, 238, 0.25)' : 'rgba(20, 28, 55, 0.6)';
-    c.fill();
-    c.strokeStyle = !isCols ? '#22d3ee' : BORDER;
-    c.lineWidth = !isCols ? 1.5 : 1;
-    c.stroke();
-    c.fillStyle = !isCols ? '#22d3ee' : '#7d8bb0';
+    drawRoundRect(c, rowTab.x, rowTab.y, rowTab.w, rowTab.h, 7);
+    if (!isCols) {
+      const g = c.createLinearGradient(rowTab.x, rowTab.y, rowTab.x + rowTab.w, rowTab.y + rowTab.h);
+      g.addColorStop(0, 'rgba(2, 132, 199, 0.55)');
+      g.addColorStop(1, 'rgba(14, 165, 233, 0.35)');
+      c.fillStyle = g;
+      c.fill();
+      c.strokeStyle = '#00f2fe';
+      c.lineWidth = 1.5;
+      c.shadowColor = '#00f2fe';
+      c.shadowBlur = 6;
+      c.stroke();
+      c.shadowBlur = 0;
+    } else {
+      c.fillStyle = 'rgba(15, 23, 48, 0.65)';
+      c.fill();
+      c.strokeStyle = 'rgba(120, 160, 255, 0.25)';
+      c.lineWidth = 1;
+      c.stroke();
+    }
+    c.fillStyle = !isCols ? '#ffffff' : '#94a3b8';
+    c.font = `700 12px ${FONT}`;
     c.fillText('↕ 选连续 2 行 (下落)', rowTab.x + rowTab.w / 2, rowTab.y + rowTab.h / 2 + 4);
 
     // 2. 步进选择指示器 [ ◀ ] [ 选中第 X-Y 列/行 ] [ ▶ ]
@@ -79,26 +116,28 @@ export class TargetingView {
     const next = controls.targetNext;
     const lbl = controls.targetLabel;
 
-    drawRoundRect(c, prev.x, prev.y, prev.w, prev.h, 6);
-    c.fillStyle = 'rgba(30, 41, 75, 0.8)';
+    drawRoundRect(c, prev.x, prev.y, prev.w, prev.h, 7);
+    c.fillStyle = 'rgba(25, 35, 70, 0.85)';
     c.fill();
-    c.strokeStyle = BORDER;
+    c.strokeStyle = 'rgba(120, 160, 255, 0.35)';
+    c.lineWidth = 1;
     c.stroke();
-    c.fillStyle = '#cbd5e1';
+    c.fillStyle = '#e2e8f0';
     c.font = `700 15px ${FONT}`;
     c.fillText('◀', prev.x + prev.w / 2, prev.y + prev.h / 2 + 5);
 
-    drawRoundRect(c, next.x, next.y, next.w, next.h, 6);
-    c.fillStyle = 'rgba(30, 41, 75, 0.8)';
+    drawRoundRect(c, next.x, next.y, next.w, next.h, 7);
+    c.fillStyle = 'rgba(25, 35, 70, 0.85)';
     c.fill();
-    c.strokeStyle = BORDER;
+    c.strokeStyle = 'rgba(120, 160, 255, 0.35)';
+    c.lineWidth = 1;
     c.stroke();
     c.fillText('▶', next.x + next.w / 2, next.y + next.h / 2 + 5);
 
     const desc = isCols
       ? `已选第 ${tgt.startIdx + 1} - ${tgt.startIdx + 3} 列 (可点触棋盘)`
       : `已选第 ${tgt.startIdx + 1} - ${tgt.startIdx + 2} 行 (可点触棋盘)`;
-    c.font = `600 12px ${FONT}`;
+    c.font = `700 12px ${FONT}`;
     c.fillStyle = '#38bdf8';
     c.fillText(desc, lbl.x + lbl.w / 2, lbl.y + lbl.h / 2 + 4);
 
@@ -106,29 +145,38 @@ export class TargetingView {
     const ok = controls.targetConfirm;
     const cancel = controls.targetCancel;
 
-    // 确认释放
-    const okGrad = c.createLinearGradient(ok.x, ok.y, ok.x + ok.w, ok.y);
-    okGrad.addColorStop(0, '#0284c7');
-    okGrad.addColorStop(1, '#06b6d4');
-    drawRoundRect(c, ok.x, ok.y, ok.w, ok.h, 8);
+    // 确认释放（立体多段渐变）
+    const okGrad = c.createLinearGradient(ok.x, ok.y, ok.x + ok.w, ok.y + ok.h);
+    okGrad.addColorStop(0, '#00f2fe');
+    okGrad.addColorStop(0.5, '#0284c7');
+    okGrad.addColorStop(1, '#0369a1');
+    drawRoundRect(c, ok.x, ok.y, ok.w, ok.h, 9);
     c.fillStyle = okGrad;
+    c.shadowColor = '#00f2fe';
+    c.shadowBlur = 10;
     c.fill();
-    c.strokeStyle = '#38bdf8';
-    c.lineWidth = 1.5;
+    c.shadowBlur = 0;
+
+    c.beginPath();
+    c.moveTo(ok.x + 8, ok.y + 1);
+    c.lineTo(ok.x + ok.w - 8, ok.y + 1);
+    c.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    c.lineWidth = 1;
     c.stroke();
+
     c.fillStyle = '#ffffff';
-    c.font = `700 13px ${FONT}`;
+    c.font = `800 13px ${FONT}`;
     c.fillText('⤓ 确认释放重力', ok.x + ok.w / 2, ok.y + ok.h / 2 + 4.5);
 
-    // 取消
-    drawRoundRect(c, cancel.x, cancel.y, cancel.w, cancel.h, 8);
-    c.fillStyle = 'rgba(30, 41, 59, 0.85)';
+    // 取消按钮
+    drawRoundRect(c, cancel.x, cancel.y, cancel.w, cancel.h, 9);
+    c.fillStyle = 'rgba(25, 35, 65, 0.85)';
     c.fill();
-    c.strokeStyle = BORDER;
+    c.strokeStyle = 'rgba(120, 160, 255, 0.35)';
     c.lineWidth = 1;
     c.stroke();
     c.fillStyle = '#94a3b8';
-    c.font = `600 12px ${FONT}`;
+    c.font = `700 12px ${FONT}`;
     c.fillText('✖ 取消', cancel.x + cancel.w / 2, cancel.y + cancel.h / 2 + 4);
     c.textAlign = 'left';
   }
@@ -153,16 +201,27 @@ export class TargetingView {
       const y = bTop;
       const h = bH;
 
-      // 选区纵向光带
-      c.fillStyle = 'rgba(34, 211, 238, 0.22)';
+      // 全息纵向能量柱（中心向边缘渐弱光效）
+      const beamGrad = c.createLinearGradient(x, 0, x + w, 0);
+      beamGrad.addColorStop(0, 'rgba(0, 242, 254, 0.08)');
+      beamGrad.addColorStop(0.5, 'rgba(0, 242, 254, 0.28)');
+      beamGrad.addColorStop(1, 'rgba(0, 242, 254, 0.08)');
+      c.fillStyle = beamGrad;
       c.fillRect(x, y, w, h);
-      c.strokeStyle = '#22d3ee';
-      c.lineWidth = 2;
-      c.strokeRect(x, y, w, h);
 
-      // 下坠箭头光标
-      c.fillStyle = '#22d3ee';
-      c.font = `700 16px ${FONT}`;
+      // 发光霓虹轮廓
+      c.strokeStyle = '#00f2fe';
+      c.lineWidth = 2;
+      c.shadowColor = '#00f2fe';
+      c.shadowBlur = 10;
+      c.strokeRect(x, y, w, h);
+      c.shadowBlur = 0;
+
+      // 动态下坠箭头光标
+      c.fillStyle = '#ffffff';
+      c.shadowColor = '#00f2fe';
+      c.shadowBlur = 8;
+      c.font = `800 16px ${FONT}`;
       c.textAlign = 'center';
       for (let i = 0; i < 5; i++) {
         c.fillText('⤓', x + w / 2, y + 25 + i * (h / 5));
@@ -173,19 +232,29 @@ export class TargetingView {
       const y = bTop + tgt.startIdx * cellH;
       const h = cellH * 2;
 
-      // 选区横向光带
-      c.fillStyle = 'rgba(34, 211, 238, 0.22)';
+      // 全息横向能量柱
+      const beamGrad = c.createLinearGradient(0, y, 0, y + h);
+      beamGrad.addColorStop(0, 'rgba(0, 242, 254, 0.08)');
+      beamGrad.addColorStop(0.5, 'rgba(0, 242, 254, 0.28)');
+      beamGrad.addColorStop(1, 'rgba(0, 242, 254, 0.08)');
+      c.fillStyle = beamGrad;
       c.fillRect(x, y, w, h);
-      c.strokeStyle = '#22d3ee';
-      c.lineWidth = 2;
-      c.strokeRect(x, y, w, h);
 
-      // 下坠箭头光标
-      c.fillStyle = '#22d3ee';
-      c.font = `700 16px ${FONT}`;
+      c.strokeStyle = '#00f2fe';
+      c.lineWidth = 2;
+      c.shadowColor = '#00f2fe';
+      c.shadowBlur = 10;
+      c.strokeRect(x, y, w, h);
+      c.shadowBlur = 0;
+
+      // 动态下坠箭头光标
+      c.fillStyle = '#ffffff';
+      c.shadowColor = '#00f2fe';
+      c.shadowBlur = 8;
+      c.font = `800 16px ${FONT}`;
       c.textAlign = 'center';
       for (let i = 0; i < 5; i++) {
-        c.fillText('⤓', x + 20 + i * (w / 5), y + h / 2 + 5);
+        c.fillText('⤓', x + 20 + i * (w / 5), y + h / 2 + 6);
       }
     }
     c.restore();

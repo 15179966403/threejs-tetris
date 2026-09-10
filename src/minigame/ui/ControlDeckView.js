@@ -1,7 +1,7 @@
 /**
  * 底部手柄控制台组件：十字方向键、双手动作按键组（旋转/硬降）、暂停胶囊键。
  */
-import { BORDER, ACCENT, FONT, drawRoundRect } from './UITheme.js';
+import { BORDER, ACCENT, FONT, drawRoundRect, drawPanel } from './UITheme.js';
 
 export class ControlDeckView {
   /** 计算控制台及内部所有按键的位置与尺寸 */
@@ -127,14 +127,29 @@ export class ControlDeckView {
   }
 
   drawDeckBase(ctx, W, deckY, deckH) {
-    ctx.fillStyle = 'rgba(9, 12, 24, 0.55)';
-    ctx.fillRect(0, deckY, W, deckH);
-    ctx.strokeStyle = BORDER;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, deckY + 0.5);
-    ctx.lineTo(W, deckY + 0.5);
-    ctx.stroke();
+    const c = ctx;
+    // 1. 深色微质感控制台底板（多段渐变）
+    const deckGrad = c.createLinearGradient(0, deckY, 0, deckY + deckH);
+    deckGrad.addColorStop(0, 'rgba(14, 20, 44, 0.88)');
+    deckGrad.addColorStop(0.12, 'rgba(9, 13, 30, 0.94)');
+    deckGrad.addColorStop(1, 'rgba(5, 7, 18, 0.98)');
+    c.fillStyle = deckGrad;
+    c.fillRect(0, deckY, W, deckH);
+
+    // 2. 顶部微发光霓虹地平线
+    const lineGrad = c.createLinearGradient(0, deckY, W, deckY);
+    lineGrad.addColorStop(0, 'rgba(34, 211, 238, 0.05)');
+    lineGrad.addColorStop(0.2, 'rgba(34, 211, 238, 0.35)');
+    lineGrad.addColorStop(0.5, 'rgba(0, 242, 254, 0.85)');
+    lineGrad.addColorStop(0.8, 'rgba(34, 211, 238, 0.35)');
+    lineGrad.addColorStop(1, 'rgba(34, 211, 238, 0.05)');
+
+    c.strokeStyle = lineGrad;
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(0, deckY + 0.75);
+    c.lineTo(W, deckY + 0.75);
+    c.stroke();
   }
 
   drawDpad(ctx, controls, isPressedFn) {
@@ -144,40 +159,102 @@ export class ControlDeckView {
     const cy = d.dpad.y + d.dpad.h / 2;
     const arm = d.up.w;
 
-    // 十字底座塑料渐变
-    const g = c.createLinearGradient(0, d.dpad.y, 0, d.dpad.y + d.dpad.h);
-    g.addColorStop(0, '#263156');
-    g.addColorStop(1, '#141a36');
-    c.fillStyle = g;
-    c.strokeStyle = BORDER;
+    // 1. 十字键底层金属触感圆盘底座 (D-Pad Halo Disc)
+    const haloR = d.dpad.w * 0.52;
+    c.beginPath();
+    c.arc(cx, cy, haloR, 0, Math.PI * 2);
+    const haloGrad = c.createRadialGradient(cx, cy, haloR * 0.3, cx, cy, haloR);
+    haloGrad.addColorStop(0, 'rgba(25, 34, 72, 0.45)');
+    haloGrad.addColorStop(0.85, 'rgba(15, 20, 45, 0.65)');
+    haloGrad.addColorStop(1, 'rgba(8, 12, 26, 0.85)');
+    c.fillStyle = haloGrad;
+    c.fill();
+    c.strokeStyle = 'rgba(120, 160, 255, 0.18)';
     c.lineWidth = 1;
+    c.stroke();
+
+    // 2. 十字臂本体（一体化斜角双向圆角柱）
+    const g = c.createLinearGradient(0, d.dpad.y, 0, d.dpad.y + d.dpad.h);
+    g.addColorStop(0, '#242f56');
+    g.addColorStop(0.5, '#17203e');
+    g.addColorStop(1, '#0e142b');
+    c.fillStyle = g;
+    c.strokeStyle = 'rgba(120, 160, 255, 0.3)';
+    c.lineWidth = 1;
+
+    // 横臂
     drawRoundRect(c, d.dpad.x, cy - arm / 2, d.dpad.w, arm, 10);
     c.fill();
     c.stroke();
+    // 纵臂
     drawRoundRect(c, cx - arm / 2, d.dpad.y, arm, d.dpad.h, 10);
     c.fill();
     c.stroke();
 
-    // 中心枢纽
-    c.fillStyle = 'rgba(7, 10, 20, 0.5)';
-    drawRoundRect(c, d.center.x + 4, d.center.y + 4, d.center.w - 8, d.center.h - 8, 6);
+    // 3. 中心凹陷轴心盘 (Center Pivot)
+    const cenW = d.center.w - 6;
+    const cenH = d.center.h - 6;
+    const cenX = d.center.x + 3;
+    const cenY = d.center.y + 3;
+    const cenGrad = c.createRadialGradient(cx, cy, 2, cx, cy, cenW / 2);
+    cenGrad.addColorStop(0, '#090d1c');
+    cenGrad.addColorStop(1, '#1b2446');
+    c.fillStyle = cenGrad;
+    drawRoundRect(c, cenX, cenY, cenW, cenH, cenW / 2);
+    c.fill();
+    c.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    c.lineWidth = 1;
+    c.stroke();
+
+    // 中心微型十字标
+    c.fillStyle = 'rgba(34, 211, 238, 0.4)';
+    c.beginPath();
+    c.arc(cx, cy, 2, 0, Math.PI * 2);
     c.fill();
 
-    // 四臂：按下高亮 + 方向箭头
-    for (const k of ['up', 'down', 'left', 'right']) {
+    // 4. 四向臂按键与触控反馈
+    const dirs = [
+      { key: 'up', mx: cx, my: d.up.y + d.up.h / 2 },
+      { key: 'down', mx: cx, my: d.down.y + d.down.h / 2 },
+      { key: 'left', mx: d.left.x + d.left.w / 2, my: cy },
+      { key: 'right', mx: d.right.x + d.right.w / 2, my: cy },
+    ];
+
+    for (const item of dirs) {
+      const k = item.key;
       const r = d[k];
       const pressed = isPressedFn(k);
+      const mx = item.mx;
+      const my = item.my;
+
       if (pressed) {
+        // 按下瞬间：强烈的电光青蓝色径向光晕爆发
+        const flash = c.createRadialGradient(mx, my, 2, mx, my, arm * 0.9);
+        flash.addColorStop(0, 'rgba(0, 242, 254, 0.65)');
+        flash.addColorStop(0.5, 'rgba(34, 211, 238, 0.35)');
+        flash.addColorStop(1, 'rgba(34, 211, 238, 0)');
+        c.fillStyle = flash;
+        c.beginPath();
+        c.arc(mx, my, arm * 0.85, 0, Math.PI * 2);
+        c.fill();
+
+        // 臂的高亮外框
         c.fillStyle = 'rgba(34, 211, 238, 0.22)';
-        c.strokeStyle = ACCENT;
+        c.strokeStyle = '#00f2fe';
+        c.lineWidth = 1.5;
         drawRoundRect(c, r.x + 1, r.y + 1, r.w - 2, r.h - 2, 9);
         c.fill();
         c.stroke();
       }
-      const mx = r.x + r.w / 2;
-      const my = r.y + r.h / 2;
+
+      // 方向箭头（立体几何设计）
       const s = 7;
-      c.fillStyle = pressed ? ACCENT : '#aab6dd';
+      c.save();
+      c.fillStyle = pressed ? '#ffffff' : '#94a3b8';
+      if (pressed) {
+        c.shadowColor = '#00f2fe';
+        c.shadowBlur = 10;
+      }
       c.beginPath();
       if (k === 'up') {
         c.moveTo(mx, my - s);
@@ -198,6 +275,7 @@ export class ControlDeckView {
       }
       c.closePath();
       c.fill();
+      c.restore();
     }
   }
 
@@ -208,11 +286,12 @@ export class ControlDeckView {
     // 1. 旋转按键 (btnRotate, ↻)
     const rotPressed = isPressedFn('btnRotate');
     this._drawActionButton(ctx, btnRotate, rotPressed, {
-      border: rotPressed ? '#38bdf8' : 'rgba(34, 211, 238, 0.45)',
-      grad1: rotPressed ? '#0284c7' : '#1e294f',
-      grad2: rotPressed ? '#0ea5e9' : '#0f172a',
+      border: rotPressed ? '#00f2fe' : 'rgba(34, 211, 238, 0.5)',
+      grad1: rotPressed ? '#0284c7' : '#22305a',
+      grad2: rotPressed ? '#0369a1' : '#111933',
       iconColor: rotPressed ? '#ffffff' : '#38bdf8',
-      textColor: rotPressed ? '#ffffff' : '#94a3b8',
+      textColor: rotPressed ? '#e0f2fe' : '#94a3b8',
+      glowColor: '#00f2fe',
       icon: '↻',
       text: '旋转',
     });
@@ -220,11 +299,12 @@ export class ControlDeckView {
     // 2. 硬降按键 (btnHardDrop, ⤓)
     const dropPressed = isPressedFn('btnHardDrop');
     this._drawActionButton(ctx, btnHardDrop, dropPressed, {
-      border: dropPressed ? '#facc15' : 'rgba(250, 204, 21, 0.45)',
-      grad1: dropPressed ? '#d97706' : '#28214a',
-      grad2: dropPressed ? '#f59e0b' : '#16112c',
+      border: dropPressed ? '#fbbf24' : 'rgba(250, 204, 21, 0.5)',
+      grad1: dropPressed ? '#d97706' : '#382c5a',
+      grad2: dropPressed ? '#b45309' : '#1a1433',
       iconColor: dropPressed ? '#ffffff' : '#fbbf24',
-      textColor: dropPressed ? '#ffffff' : '#94a3b8',
+      textColor: dropPressed ? '#fef3c7' : '#94a3b8',
+      glowColor: '#f59e0b',
       icon: '⤓',
       text: '硬降',
     });
@@ -233,32 +313,60 @@ export class ControlDeckView {
   _drawActionButton(c, btn, pressed, opt) {
     const { cx, cy, r } = btn;
     c.save();
+
+    // 1. 外晕爆发（按下时大面积高亮）
+    if (pressed) {
+      const aura = c.createRadialGradient(cx, cy, r * 0.2, cx, cy, r * 1.6);
+      aura.addColorStop(0, opt.glowColor ? `${opt.glowColor}aa` : 'rgba(34, 211, 238, 0.6)');
+      aura.addColorStop(1, 'transparent');
+      c.fillStyle = aura;
+      c.beginPath();
+      c.arc(cx, cy, r * 1.5, 0, Math.PI * 2);
+      c.fill();
+    }
+
+    // 2. 按键底盘
     c.beginPath();
     c.arc(cx, cy, r, 0, Math.PI * 2);
-
     const grad = c.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
     grad.addColorStop(0, opt.grad1);
     grad.addColorStop(1, opt.grad2);
     c.fillStyle = grad;
     c.fill();
 
+    // 3. 边框高亮
     c.strokeStyle = opt.border;
-    c.lineWidth = pressed ? 2.5 : 1.5;
+    c.lineWidth = pressed ? 2.5 : 1.8;
     if (pressed) {
-      c.shadowColor = opt.border;
-      c.shadowBlur = 10;
+      c.shadowColor = opt.glowColor || opt.border;
+      c.shadowBlur = 12;
     }
     c.stroke();
     c.shadowBlur = 0;
 
+    // 4. 内部高光弧度线
+    c.beginPath();
+    c.arc(cx, cy, r - 2, Math.PI * 1.15, Math.PI * 1.85);
+    c.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+    c.lineWidth = 1;
+    c.stroke();
+
+    // 5. 中心图标
     c.textAlign = 'center';
     c.fillStyle = opt.iconColor;
     c.font = `700 ${Math.round(r * 0.72)}px ${FONT}`;
+    if (pressed) {
+      c.shadowColor = opt.iconColor;
+      c.shadowBlur = 8;
+    }
     c.fillText(opt.icon, cx, cy + Math.round(r * 0.04));
+    c.shadowBlur = 0;
 
+    // 6. 底部微型功能标签
     c.fillStyle = opt.textColor;
-    c.font = `600 ${Math.max(9, Math.round(r * 0.36))}px ${FONT}`;
+    c.font = `700 ${Math.max(9, Math.round(r * 0.36))}px ${FONT}`;
     c.fillText(opt.text, cx, cy + Math.round(r * 0.62));
+
     c.restore();
   }
 
@@ -266,17 +374,18 @@ export class ControlDeckView {
     const r = controls.pause;
     if (!r) return;
     const pressed = isPressedFn('pause');
-    ctx.fillStyle = pressed ? 'rgba(34, 211, 238, 0.25)' : 'rgba(13, 18, 38, 0.85)';
-    ctx.strokeStyle = pressed ? ACCENT : 'rgba(125, 139, 176, 0.65)';
-    ctx.lineWidth = 1;
-    drawRoundRect(ctx, r.x, r.y, r.w, r.h, r.h / 2);
-    ctx.fill();
-    ctx.stroke();
 
-    ctx.fillStyle = pressed ? ACCENT : '#c5d1ec';
+    // 科技感半透明胶囊键
+    drawPanel(ctx, r.x, r.y, r.w, r.h, r.h / 2, {
+      bgTop: pressed ? 'rgba(34, 211, 238, 0.35)' : 'rgba(20, 28, 62, 0.85)',
+      bgBot: pressed ? 'rgba(14, 165, 233, 0.45)' : 'rgba(10, 15, 34, 0.92)',
+      border: pressed ? '#00f2fe' : 'rgba(120, 160, 255, 0.35)',
+    });
+
+    ctx.fillStyle = pressed ? '#ffffff' : '#dbeafe';
     ctx.font = `600 11px ${FONT}`;
     ctx.textAlign = 'center';
-    ctx.fillText('暂 停', r.x + r.w / 2, r.y + r.h / 2 + 4);
+    ctx.fillText('⏸ 暂停', r.x + r.w / 2, r.y + r.h / 2 + 3.5);
     ctx.textAlign = 'left';
   }
 }

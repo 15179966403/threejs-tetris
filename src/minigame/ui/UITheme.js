@@ -14,7 +14,7 @@ export const ACCENT_GOLD = '#facc15';
 export const ACCENT_EMERALD = '#10b981';
 export const TEXT = '#f1f5f9';
 export const MUTED = '#8899b8';
-export const FONT = `-apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", "Microsoft YaHei", sans-serif`;
+export const FONT = `"PingFang SC", "Heiti SC", "Microsoft YaHei", sans-serif`;
 
 /** 8 方向 -> NEXT 预览箭头旋转角（canvas y 轴向下，顺时针为正） */
 export const CANVAS_ANGLE = {

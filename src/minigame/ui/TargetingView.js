@@ -145,14 +145,13 @@ export class TargetingView {
     const ok = controls.targetConfirm;
     const cancel = controls.targetCancel;
 
-    // 确认释放（立体多段渐变）
+    // 确认释放（鲜明亮青渐变底盘 + 极深纯粹墨黑文字，清晰夺目）
     const okGrad = c.createLinearGradient(ok.x, ok.y, ok.x + ok.w, ok.y + ok.h);
-    okGrad.addColorStop(0, '#00f2fe');
-    okGrad.addColorStop(0.5, '#0284c7');
-    okGrad.addColorStop(1, '#0369a1');
+    okGrad.addColorStop(0, '#22d3ee');
+    okGrad.addColorStop(1, '#38bdf8');
     drawRoundRect(c, ok.x, ok.y, ok.w, ok.h, 9);
     c.fillStyle = okGrad;
-    c.shadowColor = '#00f2fe';
+    c.shadowColor = 'rgba(34, 211, 238, 0.45)';
     c.shadowBlur = 10;
     c.fill();
     c.shadowBlur = 0;
@@ -160,12 +159,12 @@ export class TargetingView {
     c.beginPath();
     c.moveTo(ok.x + 8, ok.y + 1);
     c.lineTo(ok.x + ok.w - 8, ok.y + 1);
-    c.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    c.strokeStyle = 'rgba(255, 255, 255, 0.6)';
     c.lineWidth = 1;
     c.stroke();
 
-    c.fillStyle = '#ffffff';
-    c.font = `800 13px ${FONT}`;
+    c.fillStyle = '#020b18';
+    c.font = `700 13px ${FONT}`;
     c.fillText('⤓ 确认释放重力', ok.x + ok.w / 2, ok.y + ok.h / 2 + 4.5);
 
     // 取消按钮
@@ -175,7 +174,7 @@ export class TargetingView {
     c.strokeStyle = 'rgba(120, 160, 255, 0.35)';
     c.lineWidth = 1;
     c.stroke();
-    c.fillStyle = '#94a3b8';
+    c.fillStyle = '#f1f5f9';
     c.font = `700 12px ${FONT}`;
     c.fillText('✖ 取消', cancel.x + cancel.w / 2, cancel.y + cancel.h / 2 + 4);
     c.textAlign = 'left';
@@ -221,7 +220,7 @@ export class TargetingView {
       c.fillStyle = '#ffffff';
       c.shadowColor = '#00f2fe';
       c.shadowBlur = 8;
-      c.font = `800 16px ${FONT}`;
+      c.font = `700 16px ${FONT}`;
       c.textAlign = 'center';
       for (let i = 0; i < 5; i++) {
         c.fillText('⤓', x + w / 2, y + 25 + i * (h / 5));
@@ -251,7 +250,7 @@ export class TargetingView {
       c.fillStyle = '#ffffff';
       c.shadowColor = '#00f2fe';
       c.shadowBlur = 8;
-      c.font = `800 16px ${FONT}`;
+      c.font = `700 16px ${FONT}`;
       c.textAlign = 'center';
       for (let i = 0; i < 5; i++) {
         c.fillText('⤓', x + 20 + i * (w / 5), y + h / 2 + 6);

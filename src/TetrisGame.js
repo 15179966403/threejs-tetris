@@ -119,8 +119,14 @@ export class TetrisGame {
     return BASE_ITEM_ENERGY + (this.level - 1) * ITEM_ENERGY_STEP;
   }
 
-  /** 每级下落间隔（秒），随等级加快 */
+  /**
+   * 每级下落间隔（秒）。
+   * 经典模式（classic）：随等级指数加快，保留传统体验；
+   * 特技模式（skill）：恒定 0.9s 不随等级变化——等级仅影响特殊格
+   * 出现概率与道具能量需求，压力来自规则本身而非手速。
+   */
   get dropInterval() {
+    if (this.mode === 'skill') return 0.9;
     return Math.max(0.05, 0.9 * Math.pow(0.82, this.level - 1));
   }
 

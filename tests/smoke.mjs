@@ -123,7 +123,21 @@ const check = (name, cond) => {
   }
   check('累计消 10 行升到 2 级', g.level === 2 && g.lines === 10);
   check('消行累计得分正确', g.score >= 10 * 100);
-  check('升级后下落更快', g.dropInterval < 0.9);
+  // 特技模式：下落速度恒定，不随等级变化
+  check('特技模式下降落速度恒定', g.dropInterval === 0.9);
+  g.level = 5;
+  check('特技模式高等级下落速度仍恒定', g.dropInterval === 0.9);
+}
+
+// 6b. 经典模式：下落速度随等级加快（传统体验）
+{
+  const g = new TetrisGame({ specialChance: 0, mode: 'classic' });
+  g.start();
+  check('经典模式 1 级下落间隔 0.9s', g.dropInterval === 0.9);
+  g.level = 5;
+  check('经典模式升级后下落更快', g.dropInterval < 0.9);
+  g.level = 30;
+  check('经典模式高等级下落间隔触及下限', g.dropInterval === 0.05);
 }
 
 // 7. 随机操作 2000 步压力测试，不崩溃且状态合法

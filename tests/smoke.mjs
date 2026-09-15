@@ -283,8 +283,28 @@ const check = (name, cond) => {
   g.update(1);
   check('NW 取反消除对角方块', g.board[18][4] === null && g.board[17][3] === null && g.board[16][2] === null);
   check('NW 取反在对角空位补异形块（含消行下移）', g.board[16][1] && g.board[16][1].t === 'X' && g.board[15][0] && g.board[15][0].t === 'X');
-  check('连锁右向激光清除同行方块', g.board[18][6] === null && g.board[18][8] === null);
+  // 横向箭头推迟到行落定后结算：L/Z 下移占据第19行，被推迟的右向激光沿第19行扫除
+  check('连锁右向激光在落定后沿行清除', g.board[19][6] === null && g.board[19][8] === null);
   check('得分 = 清除5格×10（手动清行无消行分）', g.score === 50);
+}
+
+// 13b. 横向箭头整行消除时推迟到行落定后结算：沿落定行横扫一侧
+{
+  const g = new TetrisGame({ specialChance: 0 });
+  g.start();
+  // 第18、19两行都填满，特殊格在 (5,19) fx=right
+  for (let c = 0; c < COLS; c++) {
+    g.board[18][c] = { t: 'O', fx: null };
+    g.board[19][c] = { t: 'O', fx: c === 5 ? 'right' : null };
+  }
+  g.clearingRows = [19];
+  g.clearTimer = 1;
+  g.state = 'clearing';
+  g.update(1);
+  // 第19行消行后第18行下移占据第19行 → 推迟的右向激光从 (5,19) 横扫 (6..9,19)
+  check('落定行右侧被横向激光开沟', [6, 7, 8, 9].every((c) => g.board[19][c] === null));
+  check('落定行左侧与箭头列保留', [0, 1, 2, 3, 4, 5].every((c) => !!g.board[19][c]));
+  check('横向激光计分（4格×10）', g.score === 40);
 }
 
 // 14. 斜向取反补全整行 → combo 连锁消行

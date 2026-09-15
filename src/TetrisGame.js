@@ -400,33 +400,92 @@ export class TetrisGame {
    * 斜向取反可能补全整行，因此消行会级联成 combo 连锁。
    */
   #finishClear() {
-    // 1. 收集被消除行中的特殊格（行尚未移除，直接使用原坐标——
-    //    「上/下/左/右/斜向」的方向语义与玩家所见完全一致）
-    const triggers = [];
+    // 1. 收集被消除行中的特殊格（行尚未移除，直接使用原坐标）：
+    //    横向箭头推迟到「行落定后」结算，其余方向立即生效
+    const immediate = [];
+    const deferred = [];
     for (const r of this.clearingRows) {
       for (let c = 0; c < COLS; c++) {
         const cell = this.board[r][c];
-        if (cell && cell.fx) triggers.push({ x: c, y: r, fx: cell.fx });
+        if (cell && cell.fx) {
+          if (cell.fx === 'left' || cell.fx === 'right') {
+            // 推迟起点 = 消行下移后该特殊格列所在的落定行
+            const below = this.clearingRows.filter((rr) => rr > r).length;
+            deferred.push({ x: c, y: r + below, fx: cell.fx });
+          } else {
+            immediate.push({ x: c, y: r, fx: cell.fx });
+          }
+        }
       }
     }
 
-    // 2. 移除行之前施加方向效果：正交激光清除 / 斜向取反，
-    //    被清除的特殊格连锁入队，同样作用于消除前的棋盘。
-    //    （此前在“移除+下移之后”才施加，向上/斜向的起点换算存在错位，
-    //     导致紧邻上方的方块漏删）
-    let cellsCleared = 0;
-    const queue = triggers;
-    if (triggers.length) {
-      this.#addEnergy(triggers.length);
+    // 2. 移除行之前：垂直激光与斜向取反立即生效；
+    //    横向箭头推迟到「行落定后」结算（收集阶段已换算落定行号）
+    // 触发特殊格积攒道具能量（立即 + 推迟的横向一并计入）
+    this.#addEnergy(immediate.length + deferred.length);
+    let cellsCleared = this.#runBeams(immediate, false, deferred);
+
+    // 3. 移除已消除的行 + 上方下移，随后按新布局校准倒计时销毁队列
+    this.board = this.board.filter((_, r) => !this.clearingRows.includes(r));
+    while (this.board.length < ROWS) this.board.unshift(Array(COLS).fill(null));
+    this.#updateDecayQueueAfterClear(this.clearingRows); // 必须在下移后校准（依赖新棋盘验证）
+    this.clearingRows = [];
+
+    // 4. 棋盘落定后：发射推迟的横向激光——沿落定行横扫一侧，
+    //    对下移后的残余堆叠产生真实的开沟效果（可继续连锁垂直/斜向效果）
+    cellsCleared += this.#runBeams(deferred, true, deferred);
+
+    if (cellsCleared) this.score += cellsCleared * LASER_CELL_SCORE * this.level;
+
+    const full = [];
+    for (let r = 0; r < ROWS; r++) if (this.board[r].every((v) => v)) full.push(r);
+    if (full.length && this.combo < MAX_COMBO) {
+      this.combo += 1;
+      this.clearingRows = full;
+      this.clearPhase = 0;
+      this.clearTimer = 0;
+      this.state = 'clearing'; // 留在 clearing：下一波动画结束后再次进入本方法
+      this.fxEvents.push({ type: 'clear', rows: full.slice() });
+      this.score += LINE_SCORES[full.length] * this.level * (this.combo + 1);
+      this.lines += full.length;
+      this.level = Math.floor(this.lines / 10) + 1;
+      return;
     }
+
+    // 5. 消行与连锁结束，进入消除后棋盘布局观察期（暂停图形下落，给玩家时间观察消除后的棋盘）
+    this.combo = 0;
+    this.clearPhase = 1;
+    this.clearTimer = 0;
+    this.state = 'clearing';
+  }
+
+  /**
+   * 依次施加一队方向效果。
+   * @param postShift false = 棋盘落定前（横向箭头推迟结算）；true = 已落定（横向立即结算）
+   * @returns 清除的格子数（用于计分）
+   */
+  #runBeams(queue, postShift, deferred) {
+    let cellsCleared = 0;
+    const ctx = { queue, deferred, postShift, clearingRows: this.clearingRows, fx: null, touched: null };
     while (queue.length) {
       const { x, y, fx } = queue.shift();
       const [dx, dy] = FX_DIRS[fx];
       const touched = [];
+      ctx.touched = touched; // 每条光束独立的触达记录，挂到 ctx 供 #applyFx 写入
+      ctx.fx = fx; // 当前光束的方向（供 #applyFx 判断 ne/nw 顶部保护）
+
+      // 棋盘落定前：横向箭头推迟结算——它所在行即将整行移除，
+      // 立即沿行清空毫无作用；推迟到行落定后横扫一侧，才对残余堆叠有真实效果
+      if (!postShift && (fx === 'left' || fx === 'right')) {
+        const below = this.clearingRows.filter((rr) => rr > y).length;
+        deferred.push({ x, y: y + below, fx });
+        continue;
+      }
+
       let xx = x + dx;
       let yy = y + dy;
       while (xx >= 0 && xx < COLS && yy >= 0 && yy < ROWS) {
-        cellsCleared += this.#applyFx(xx, yy, dx, dy, queue, touched, fx);
+        cellsCleared += this.#applyFx(xx, yy, dx, dy, ctx);
         xx += dx;
         yy += dy;
       }
@@ -460,36 +519,9 @@ export class TetrisGame {
         }
       }
     }
-    if (cellsCleared) this.score += cellsCleared * LASER_CELL_SCORE * this.level;
-
-    // 3. 移除已消除的行 + 上方下移，随后按新布局校准倒计时销毁队列
-    this.board = this.board.filter((_, r) => !this.clearingRows.includes(r));
-    while (this.board.length < ROWS) this.board.unshift(Array(COLS).fill(null));
-    this.#updateDecayQueueAfterClear(this.clearingRows); // 必须在下移后校准（依赖新棋盘验证）
-    this.clearingRows = [];
-    const full = [];
-    for (let r = 0; r < ROWS; r++) if (this.board[r].every((v) => v)) full.push(r);
-    if (full.length && this.combo < MAX_COMBO) {
-      this.combo += 1;
-      this.clearingRows = full;
-      this.clearPhase = 0;
-      this.clearTimer = 0;
-      this.state = 'clearing'; // 留在 clearing：下一波动画结束后再次进入本方法
-      this.fxEvents.push({ type: 'clear', rows: full.slice() });
-      this.score += LINE_SCORES[full.length] * this.level * (this.combo + 1);
-      this.lines += full.length;
-      this.level = Math.floor(this.lines / 10) + 1;
-      return;
-    }
-
-    // 5. 消行与连锁结束，进入消除后棋盘布局观察期（暂停图形下落，给玩家时间观察消除后的棋盘）
-    this.combo = 0;
-    this.clearPhase = 1;
-    this.clearTimer = 0;
-    this.state = 'clearing';
+    return cellsCleared;
   }
 
-  /** 布局观察期结束，恢复游戏下落并生成新方块 */
   #finishSettle() {
     this.clearPhase = 0;
     this.combo = 0;
@@ -498,7 +530,14 @@ export class TetrisGame {
   }
 
   /** 对单个格子施加方向效果：正交=清除，斜向=取反；返回清除的格子数 */
-  #applyFx(x, y, dx, dy, queue, touched, fx) {
+  #applyFx(x, y, dx, dy, ctx) {
+    console.log('[fx] (' + x + ',' + y + ') dir=' + ctx.fx + ' post=' + ctx.postShift + ' cell=' + (this.board[y][x] ? this.board[y][x].t : '.') + ' -> ' + (this.board[y][x] ? 'remove' : 'addX'));
+    console.log('    board:');
+    for (let r = 19; r >= 0; r--) {
+      const row = this.board[r].map(v => v ? (v.t + (v.fx ? '*' : '')) : '.').join('');
+      if (row !== '..........') console.log('      r' + String(r).padStart(2), row);
+    }
+    console.log('[fx] cell', x, y, 'dir', ctx.fx, ctx.dx + ',' + ctx.dy, 'postShift', ctx.postShift, 'cell:', this.board[y][x] ? this.board[y][x].t + (this.board[y][x].fx || '') : 'empty');
     const diagonal = dx !== 0 && dy !== 0;
     const cell = this.board[y][x];
     if (diagonal) {
@@ -506,29 +545,40 @@ export class TetrisGame {
       if (cell) {
         this.board[y][x] = null;
         if (cell.fx) {
-          queue.push({ x, y, fx: cell.fx });
+          this.#enqueueFx(cell.fx, x, y, ctx);
           this.#addEnergy(1);
         }
-        touched.push([x, y, 0]);
+        ctx.touched.push([x, y, 0]);
         return 1;
       }
       // 东北 / 西北斜向箭头：如果生成的方块在顶部四行范围内（y < 4），则取消生成
       // 防止堵住新生方块下落位置导致游戏直接结束
-      if ((fx === 'ne' || fx === 'nw') && y < 4) {
+      const isDiagonalArrow = ctx.fx === 'ne' || ctx.fx === 'nw';
+      if (isDiagonalArrow && y < 4) {
         return 0;
       }
       this.board[y][x] = { t: 'X', fx: null };
-      touched.push([x, y, 1]);
+      ctx.touched.push([x, y, 1]);
       return 0;
     }
     if (!cell) return 0;
     this.board[y][x] = null;
     if (cell.fx) {
-      queue.push({ x, y, fx: cell.fx });
+      this.#enqueueFx(cell.fx, x, y, ctx);
       this.#addEnergy(1);
     }
-    touched.push([x, y, 0]);
+    ctx.touched.push([x, y, 0]);
     return 1;
+  }
+
+  /** 连锁入队：横向箭头在棋盘落定前被清除时推迟到落定后结算，其余立即入队 */
+  #enqueueFx(fx, x, y, ctx) {
+    if (!ctx.postShift && (fx === 'left' || fx === 'right')) {
+      const below = ctx.clearingRows.filter((rr) => rr > y).length;
+      ctx.deferred.push({ x, y: y + below, fx });
+    } else {
+      ctx.queue.push({ x, y, fx });
+    }
   }
 
   /** 触发特殊箭头方块时积攒道具能量（经典模式关闭） */

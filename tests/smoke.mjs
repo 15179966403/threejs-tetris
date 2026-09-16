@@ -540,5 +540,36 @@ const check = (name, cond) => {
   check('显式关闭或覆盖特殊概率时不随等级改变', gDisabled.specialChance === 0);
 }
 
+// 18. 下落中使用重力道具：方块先落定并入棋盘（不凭空消失），再施加位移
+{
+  const g = new TetrisGame({ specialChance: 0 });
+  g.start();
+  g.items.push({ id: 21, type: 'gravity', name: '重力', dir: 'down' });
+
+  // 模拟下落到一半的活动方块：横 I 悬在 (17,3..6)
+  g.current = {
+    type: 'I',
+    matrix: [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+    x: 3,
+    y: 17,
+    special: null,
+  };
+  // 第 19 行已铺满两侧、中间 3~5 列空缺 —— 活动方块落定+重力压实后恰好补满第 19 行
+  for (let c = 0; c < COLS; c++) {
+    if (c < 3 || c > 5) g.board[19][c] = { t: 'Z', fx: null };
+  }
+
+  const used = g.useGravity('cols', 3, 'down');
+  check('下落中使用重力道具成功', used === true);
+  // 活动方块已落定并入棋盘，且重力压实后补全第 19 行 → 触发消行
+  check('落定方块触发整行消除', g.state === 'clearing' && g.clearingRows.includes(19));
+  check('活动方块已并入棋盘（不再凭空消失）',
+    g.board[19][3] && g.board[19][3].t === 'I' && g.board[19][4] && g.board[19][4].t === 'I');
+
+  g.update(1); // 消行动画 + 观察期
+  check('结算后生成新方块（旧方块未被丢弃）', g.state === 'playing' && g.current !== null);
+  check('消行计分', g.score >= 100);
+}
+
 console.log(failures === 0 ? '\n全部通过 ✔' : `\n${failures} 项失败 ✘`);
 process.exit(failures === 0 ? 0 : 1);

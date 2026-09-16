@@ -623,6 +623,25 @@ export class TetrisGame {
     // 消耗该道具
     this.items.splice(itemIdx, 1);
 
+    // 先将下落中的方块落定并入棋盘（等同瞬间锁定）：
+    // 重力位移只作用于棋盘方块。若不先落定：位移可能把棋盘方块移进
+    // 活动方块的位置造成重叠；且位移补全整行进入消行结算后，活动方块
+    // 会被新方块直接顶掉（表现为下落中的方块凭空消失）
+    if (this.current) {
+      const { matrix, x, y, type, special } = this.current;
+      for (let r = 0; r < matrix.length; r++) {
+        for (let c = 0; c < matrix[r].length; c++) {
+          if (!matrix[r][c]) continue;
+          const bx = x + c;
+          const by = y + r;
+          if (by < 0) continue; // 高出可见区的部分丢弃（道具场景不判负）
+          const isSpecial = special && special.r === r && special.c === c;
+          this.board[by][bx] = { t: type, fx: isSpecial ? special.fx : null };
+        }
+      }
+      this.current = null;
+    }
+
     // 执行重力位移
     this.#applyGravityShift(mode, safeStartIdx, dir);
 
@@ -666,7 +685,12 @@ export class TetrisGame {
       this.score += LINE_SCORES[full.length] * this.level;
       this.lines += full.length;
       this.level = Math.floor(this.lines / 10) + 1;
+      // 进入消行连锁：观察期结束后由 #finishSettle 生成新方块
+      return true;
     }
+
+    // 无连锁：活动方块已在上方落定，立即生成新方块避免操作空窗
+    if (!this.current) this.#spawn();
 
     return true;
   }

@@ -6,9 +6,6 @@ import {
   LINE_SCORES,
   CLEAR_TIME,
   SETTLE_TIME,
-  SPECIAL_CHANCE,
-  SPECIAL_CHANCE_STEP,
-  MAX_SPECIAL_CHANCE,
   FX_TYPES,
   LASER_CELL_SCORE,
   MAX_COMBO,
@@ -16,6 +13,7 @@ import {
   BASE_ITEM_ENERGY,
   ITEM_ENERGY_STEP,
 } from './constants.js';
+import { getMode } from './game/modes/index.js';
 
 /** 方向 -> (列增量, 行增量)；行号向下增长，up 即 dy=-1 */
 const FX_DIRS = {
@@ -69,17 +67,14 @@ export class TetrisGame {
    */
   constructor(options = {}) {
     this.mode = options.mode || 'skill'; // 'skill' | 'classic'
+    this.rules = getMode(this.mode); // 模式策略对象：下落间隔 / 特殊格概率 / 道具开关
     this._specialChanceOverride = options.specialChance !== undefined ? options.specialChance : null;
     this.reset(options);
   }
 
   /** 当前特殊格生成概率：随等级递增，或优先使用显式覆盖设置；经典模式恒为 0 */
   get specialChance() {
-    if (this.mode === 'classic') return 0;
-    if (this._specialChanceOverride !== null && this._specialChanceOverride !== undefined) {
-      return this._specialChanceOverride;
-    }
-    return Math.min(MAX_SPECIAL_CHANCE, SPECIAL_CHANCE + (this.level - 1) * SPECIAL_CHANCE_STEP);
+    return this.rules.specialChance(this.level, this._specialChanceOverride);
   }
 
   set specialChance(val) {
@@ -87,7 +82,10 @@ export class TetrisGame {
   }
 
   reset(options = {}) {
-    if (options && options.mode) this.mode = options.mode;
+    if (options && options.mode) {
+      this.mode = options.mode;
+      this.rules = getMode(this.mode);
+    }
     if (options && options.specialChance !== undefined) {
       this._specialChanceOverride = options.specialChance;
     }
@@ -120,14 +118,11 @@ export class TetrisGame {
   }
 
   /**
-   * 每级下落间隔（秒）。
-   * 经典模式（classic）：随等级指数加快，保留传统体验；
-   * 特技模式（skill）：恒定 0.9s 不随等级变化——等级仅影响特殊格
-   * 出现概率与道具能量需求，压力来自规则本身而非手速。
+   * 每级下落间隔（秒）。数值策略由模式对象提供：
+   * 经典模式随等级指数加快；特技模式恒定 0.9s。
    */
   get dropInterval() {
-    if (this.mode === 'skill') return 0.9;
-    return Math.max(0.05, 0.9 * Math.pow(0.82, this.level - 1));
+    return this.rules.dropInterval(this.level);
   }
 
   /** 7-bag 随机器：每 7 个方块一组洗牌，保证分布均匀；同时随机生成特殊格 */
@@ -583,7 +578,7 @@ export class TetrisGame {
 
   /** 触发特殊箭头方块时积攒道具能量（经典模式关闭） */
   #addEnergy(amount = 1) {
-    if (this.mode === 'classic') return;
+    if (!this.rules.itemsEnabled) return;
     this.itemEnergy += amount;
     while (this.itemEnergy >= this.requiredEnergy && this.items.length < MAX_ITEMS) {
       this.itemEnergy -= this.requiredEnergy;
@@ -610,7 +605,7 @@ export class TetrisGame {
    * @returns {boolean} 是否成功使用
    */
   useGravity(mode, startIdx, dir = 'down') {
-    if (this.mode === 'classic' || this.state !== 'playing') return false;
+    if (!this.rules.itemsEnabled || this.state !== 'playing') return false;
     const itemIdx = this.items.findIndex((it) => it.type === 'gravity');
     if (itemIdx === -1) return false;
 

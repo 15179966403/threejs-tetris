@@ -263,7 +263,7 @@ export class BoardView {
     // 2. 活动方块 + 落点投影
     let ai = 0;
     this.activeFx.visible = false;
-    if (game.current && game.state === 'playing') {
+    if (game.current && (game.state === 'playing' || game.state === 'clearing')) {
       const { matrix, x, y, type, special } = game.current;
       const color = COLORS[type];
       const gy = game.ghostY();

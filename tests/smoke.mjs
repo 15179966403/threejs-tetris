@@ -540,35 +540,46 @@ const check = (name, cond) => {
   check('显式关闭或覆盖特殊概率时不随等级改变', gDisabled.specialChance === 0);
 }
 
-// 18. 下落中使用重力道具：方块先落定并入棋盘（不凭空消失），再施加位移
+// 18. 下落中使用重力道具：活动方块保持在空中继续正常下落，不被定格入板，消行结算后不重复生成新方块堆叠
 {
   const g = new TetrisGame({ specialChance: 0 });
   g.start();
   g.items.push({ id: 21, type: 'gravity', name: '重力', dir: 'down' });
 
-  // 模拟下落到一半的活动方块：横 I 悬在 (17,3..6)
+  // 模拟在半空中下落的活动方块：横 I 悬在 (y=5, x=3..6)
   g.current = {
     type: 'I',
     matrix: [[1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
     x: 3,
-    y: 17,
+    y: 5,
     special: null,
   };
-  // 第 19 行已铺满两侧、中间 3~5 列空缺 —— 活动方块落定+重力压实后恰好补满第 19 行
+
+  // 底层第 19 行铺满两侧，中间 3~5 列在第 17 行有悬空方块；重力下坠将压实补满第 19 行
   for (let c = 0; c < COLS; c++) {
     if (c < 3 || c > 5) g.board[19][c] = { t: 'Z', fx: null };
   }
+  g.board[17][3] = { t: 'Z', fx: null };
+  g.board[17][4] = { t: 'Z', fx: null };
+  g.board[17][5] = { t: 'Z', fx: null };
 
   const used = g.useGravity('cols', 3, 'down');
   check('下落中使用重力道具成功', used === true);
-  // 活动方块已落定并入棋盘，且重力压实后补全第 19 行 → 触发消行
-  check('落定方块触发整行消除', g.state === 'clearing' && g.clearingRows.includes(19));
-  check('活动方块已并入棋盘（不再凭空消失）',
-    g.board[19][3] && g.board[19][3].t === 'I' && g.board[19][4] && g.board[19][4].t === 'I');
+  // 活动方块绝不能被定格固化到空中棋盘上！
+  check('空中活动方块未被固化写入棋盘', g.board[5][3] === null && g.board[5][4] === null);
+  check('活动方块对象完好保持在空中', g.current && g.current.type === 'I' && g.current.y === 5);
+  // 棋盘底层方块重力压实后补全第 19 行触发消行
+  check('棋盘底层方块重力压实触发消行', g.state === 'clearing' && g.clearingRows.includes(19));
 
-  g.update(1); // 消行动画 + 观察期
-  check('结算后生成新方块（旧方块未被丢弃）', g.state === 'playing' && g.current !== null);
-  check('消行计分', g.score >= 100);
+  // 模拟消行动画与观察期结束
+  g.update(1);
+  check('消行观察期后恢复 playing 状态', g.state === 'playing');
+  check('原本在空中的活动方块未被顶替，依然由玩家控制', g.current && g.current.type === 'I');
+  check('没有在顶部重复生成新方块造成堆叠堵塞', g.board[0][3] === null && g.board[1][3] === null);
+  check('游戏绝非 Game Over', g.state !== 'gameover');
+  // 玩家可以继续正常移动或下落原方块
+  const moved = g.move(0, 1);
+  check('原活动方块可继续正常下落', moved === true && g.current.y === 6);
 }
 
 console.log(failures === 0 ? '\n全部通过 ✔' : `\n${failures} 项失败 ✘`);

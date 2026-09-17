@@ -426,6 +426,13 @@ export class TetrisGame {
     this.#updateDecayQueueAfterClear(this.clearingRows); // 必须在下移后校准（依赖新棋盘验证）
     this.clearingRows = [];
 
+    // 若当前在空中仍有活动方块（如道具引发的消行），棋盘下移后确保无重叠碰撞
+    if (this.current && this.#collides(this.current.matrix, this.current.x, this.current.y)) {
+      while (this.current.y > 0 && this.#collides(this.current.matrix, this.current.x, this.current.y)) {
+        this.current.y--;
+      }
+    }
+
     // 4. 棋盘落定后：发射推迟的横向激光——沿落定行横扫一侧，
     //    对下移后的残余堆叠产生真实的开沟效果（可继续连锁垂直/斜向效果）
     cellsCleared += this.#runBeams(deferred, true, deferred);
@@ -521,18 +528,13 @@ export class TetrisGame {
     this.clearPhase = 0;
     this.combo = 0;
     this.state = 'playing';
-    this.#spawn();
+    if (!this.current) {
+      this.#spawn();
+    }
   }
 
   /** 对单个格子施加方向效果：正交=清除，斜向=取反；返回清除的格子数 */
   #applyFx(x, y, dx, dy, ctx) {
-    console.log('[fx] (' + x + ',' + y + ') dir=' + ctx.fx + ' post=' + ctx.postShift + ' cell=' + (this.board[y][x] ? this.board[y][x].t : '.') + ' -> ' + (this.board[y][x] ? 'remove' : 'addX'));
-    console.log('    board:');
-    for (let r = 19; r >= 0; r--) {
-      const row = this.board[r].map(v => v ? (v.t + (v.fx ? '*' : '')) : '.').join('');
-      if (row !== '..........') console.log('      r' + String(r).padStart(2), row);
-    }
-    console.log('[fx] cell', x, y, 'dir', ctx.fx, ctx.dx + ',' + ctx.dy, 'postShift', ctx.postShift, 'cell:', this.board[y][x] ? this.board[y][x].t + (this.board[y][x].fx || '') : 'empty');
     const diagonal = dx !== 0 && dy !== 0;
     const cell = this.board[y][x];
     if (diagonal) {
@@ -618,26 +620,7 @@ export class TetrisGame {
     // 消耗该道具
     this.items.splice(itemIdx, 1);
 
-    // 先将下落中的方块落定并入棋盘（等同瞬间锁定）：
-    // 重力位移只作用于棋盘方块。若不先落定：位移可能把棋盘方块移进
-    // 活动方块的位置造成重叠；且位移补全整行进入消行结算后，活动方块
-    // 会被新方块直接顶掉（表现为下落中的方块凭空消失）
-    if (this.current) {
-      const { matrix, x, y, type, special } = this.current;
-      for (let r = 0; r < matrix.length; r++) {
-        for (let c = 0; c < matrix[r].length; c++) {
-          if (!matrix[r][c]) continue;
-          const bx = x + c;
-          const by = y + r;
-          if (by < 0) continue; // 高出可见区的部分丢弃（道具场景不判负）
-          const isSpecial = special && special.r === r && special.c === c;
-          this.board[by][bx] = { t: type, fx: isSpecial ? special.fx : null };
-        }
-      }
-      this.current = null;
-    }
-
-    // 执行重力位移
+    // 执行重力位移（作用于棋盘已锁定方块）
     this.#applyGravityShift(mode, safeStartIdx, dir);
 
     // 同步校准 decayQueue
@@ -680,12 +663,15 @@ export class TetrisGame {
       this.score += LINE_SCORES[full.length] * this.level;
       this.lines += full.length;
       this.level = Math.floor(this.lines / 10) + 1;
-      // 进入消行连锁：观察期结束后由 #finishSettle 生成新方块
       return true;
     }
 
-    // 无连锁：活动方块已在上方落定，立即生成新方块避免操作空窗
-    if (!this.current) this.#spawn();
+    // 若无消行连锁，确保当前活动方块与位移后棋盘无重叠碰撞（防御性防穿透）
+    if (this.current && this.#collides(this.current.matrix, this.current.x, this.current.y)) {
+      while (this.current.y > 0 && this.#collides(this.current.matrix, this.current.x, this.current.y)) {
+        this.current.y--;
+      }
+    }
 
     return true;
   }

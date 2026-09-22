@@ -65,15 +65,21 @@ export class LayaAgent {
       return;
     }
 
-    // 1. 特技模式专属：重力技能自动检测与智能释放（垂直压实与水平消井）
+    // 1. 特技模式专属：重力技能自动检测与智能释放（垂直压实与高位防暴毙水平聚拢）
     if (this.gravityCooldown > 0) this.gravityCooldown -= dt;
-    if (this.gravityCooldown <= 0 && game.rules.itemsEnabled) {
+    // 濒危紧急判定：方块接近顶部天花板（高度 >= 14，即顶部第 6 行以内已有方块）时可突破冷却强行自救
+    const isEmergency = game.board.some((row, r) => r <= 6 && row.some(Boolean));
+    if ((this.gravityCooldown <= 0 || isEmergency) && game.rules.itemsEnabled) {
       if (this.checkAndUseGravity(game)) {
         this.gravityCooldown = 0.8; // 释放后冷却 0.8 秒
+        this.target = null;
+        this.currentPieceId = null;
         return;
       }
       if (this.checkAndUseHorizontalGravity(game)) {
         this.gravityCooldown = 0.8;
+        this.target = null;
+        this.currentPieceId = null;
         return;
       }
     }
@@ -122,10 +128,12 @@ export class LayaAgent {
       if (colH > maxHeight) maxHeight = colH;
     }
 
-    // 全局空洞达到 2 个以上，或堆叠较高（>=10）且存在空洞时，即刻使用全盘重力道具压实棋盘
-    if (totalHollows >= 2 || (maxHeight >= 10 && totalHollows >= 1)) {
+    // 全局空洞达到 2 个以上，或堆叠较高（>=8）且存在空洞时，即刻使用全盘重力道具压实棋盘
+    if (totalHollows >= 2 || (maxHeight >= 8 && totalHollows >= 1)) {
       const ok = game.useGravity('all', 0, 'down');
       if (ok) {
+        this.target = null;
+        this.currentPieceId = null;
         this.lastThought = `⚡ 全屏重力释放！全体方块下坠压实 (消除 ${totalHollows} 空洞)`;
         if (this.onStatusChange) this.onStatusChange(this.status, this.lastThought);
         return true;
@@ -134,18 +142,81 @@ export class LayaAgent {
     return false;
   }
 
-  /** 智能释放水平重力道具：发现棋盘出现多个深井、列间割裂或可一键聚合消行时触发 */
+  /** 模拟水平重力推移聚拢效果（预演消行数与下落后的最高高度） */
+  simulateHorizontalGravity(board, dir = 'auto') {
+    const simDir = (d) => {
+      const b = board.map((row) => row.slice());
+      const isLeft = d === 'left';
+      // 1. 每行横向推移
+      for (let r = 0; r < ROWS; r++) {
+        const nonNull = b[r].filter((cell) => cell !== null && cell !== undefined);
+        if (nonNull.length === 0 || nonNull.length === COLS) continue;
+        const newRow = new Array(COLS).fill(null);
+        if (isLeft) {
+          for (let i = 0; i < nonNull.length; i++) newRow[i] = nonNull[i];
+        } else {
+          const offset = COLS - nonNull.length;
+          for (let i = 0; i < nonNull.length; i++) newRow[offset + i] = nonNull[i];
+        }
+        b[r] = newRow;
+      }
+      // 2. 垂直沉降
+      for (let c = 0; c < COLS; c++) {
+        for (let r = ROWS - 2; r >= 0; r--) {
+          if (b[r][c] !== null && b[r][c] !== undefined) {
+            let targetY = r;
+            while (targetY + 1 < ROWS && (b[targetY + 1][c] === null || b[targetY + 1][c] === undefined)) {
+              targetY++;
+            }
+            if (targetY !== r) {
+              b[targetY][c] = b[r][c];
+              b[r][c] = null;
+            }
+          }
+        }
+      }
+      // 3. 计算消行
+      let lines = 0;
+      const kept = b.filter((row) => {
+        const isFull = row.every((v) => v !== null && v !== undefined);
+        if (isFull) lines++;
+        return !isFull;
+      });
+      while (kept.length < ROWS) kept.unshift(new Array(COLS).fill(null));
+
+      // 4. 沉降后的最高列高
+      let maxH = 0;
+      for (let c = 0; c < COLS; c++) {
+        let r = 0;
+        while (r < ROWS && (kept[r][c] === null || kept[r][c] === undefined)) r++;
+        const h = ROWS - r;
+        if (h > maxH) maxH = h;
+      }
+      return { lines, maxH, dir: d };
+    };
+
+    const left = simDir('left');
+    const right = simDir('right');
+    if (dir === 'left') return left;
+    if (dir === 'right') return right;
+    if (left.lines > right.lines) return left;
+    if (right.lines > left.lines) return right;
+    return left.maxH <= right.maxH ? left : right;
+  }
+
+  /** 智能释放水平重力道具：高位防暴毙、聚合消行与深井消除 */
   checkAndUseHorizontalGravity(game) {
     if (!game.items || !game.items.length) return false;
     const hasHGravity = game.items.some((it) => it.type === 'horizontal_gravity');
     if (!hasHGravity) return false;
 
-    // 扫描各列高度与井数
+    // 扫描各列高度与最高高度
     const heights = Array.from({ length: COLS }, (_, x) => {
       let r = 0;
       while (r < ROWS && !game.board[r][x]) r++;
       return ROWS - r;
     });
+    const maxHeight = Math.max(...heights);
 
     // 计算深井数量与总井深
     let wellsCount = 0;
@@ -167,11 +238,42 @@ export class LayaAgent {
       roughness += Math.abs(heights[c] - heights[c - 1]);
     }
 
-    // 触发条件：存在 2 个及以上深井、累计井深 >= 5，或粗糙度 >= 12 且有深井
-    if (wellsCount >= 2 || totalWellDepth >= 5 || (roughness >= 12 && wellsCount >= 1)) {
+    // 预演水平重力效果
+    const sim = this.simulateHorizontalGravity(game.board);
+    const heightReduction = maxHeight - sim.maxH;
+
+    // 多梯度触发条件：
+    // 1. 【极高位防暴毙】：高度 >= 12 时（仅剩 <= 8 格安全空间），无论盘面如何无条件释放聚拢压缩，杜绝 Game Over！
+    const emergencyTopRisk = maxHeight >= 12;
+
+    // 2. 【高位泄压】：高度 >= 9 时，若能消除任何行、降低高度、存在任何深井或粗糙不平，果断释放
+    const highStackRelief = maxHeight >= 9 && (sim.lines >= 1 || heightReduction >= 1 || wellsCount >= 1 || roughness >= 6);
+
+    // 3. 【战术消行】：只要能消除行且盘面有一定高度 (>= 5)，立即释放腾出空间并得分
+    const tacticalClear = sim.lines >= 1 && maxHeight >= 5;
+
+    // 4. 【结构修复】：深井与严重凹凸消除
+    const structureRepair = wellsCount >= 2 || totalWellDepth >= 4 || (roughness >= 8 && wellsCount >= 1) || roughness >= 12;
+
+    if (emergencyTopRisk || highStackRelief || tacticalClear || structureRepair) {
       const ok = game.useHorizontalGravity('auto');
       if (ok) {
-        this.lastThought = `⚡ 水平重力释放！方块聚拢消井 (消除 ${wellsCount} 个井)`;
+        // 重置规划状态，强制下帧基于新盘面重新推演最优落点
+        this.target = null;
+        this.currentPieceId = null;
+
+        let reason = '';
+        if (emergencyTopRisk) {
+          reason = `⚡ 极高位紧急防暴毙！释放水平重力压缩 (高度 ${maxHeight} -> ${sim.maxH})`;
+        } else if (tacticalClear || sim.lines >= 1) {
+          reason = `⚡ 水平重力消行！横向聚拢消除 ${sim.lines} 行 (高度降至 ${sim.maxH})`;
+        } else if (highStackRelief) {
+          reason = `⚡ 高位泄压！释放水平重力拉开安全距离 (高度 ${maxHeight} -> ${sim.maxH})`;
+        } else {
+          reason = `⚡ 水平重力释放！方块聚拢消井 (消除 ${wellsCount} 个井)`;
+        }
+
+        this.lastThought = reason;
         if (this.onStatusChange) this.onStatusChange(this.status, this.lastThought);
         return true;
       }
@@ -240,10 +342,13 @@ export class LayaAgent {
         composite -= (c.heightSpread - 2) * 0.15; // 极差超过 2 扣分，保持像桌面一样平整
       }
 
-      // 6. 高度危险指数惩罚：当整体盘面升高时，严惩向高处堆积
+      // 6. 高度危险指数惩罚：当整体盘面升高时，严惩向高处堆积；若接近天花板施加剧烈惩罚以防顶死
       const dangerHeight = Math.max(0, c.topHeight - 5);
-      const heightFactor = maxBoardHeight >= 8 ? 0.09 : 0.04;
-      composite -= (dangerHeight ** 1.6) * heightFactor;
+      const heightFactor = maxBoardHeight >= 12 ? 0.20 : maxBoardHeight >= 8 ? 0.10 : 0.04;
+      composite -= (dangerHeight ** 1.7) * heightFactor;
+      if (c.topHeight >= 16) {
+        composite -= 3.0; // 极高位严禁顶升，优先寻找任何能低放或消行的位置
+      }
 
       // 7. 表面粗糙度微调惩罚
       composite -= c.bump * 0.06;

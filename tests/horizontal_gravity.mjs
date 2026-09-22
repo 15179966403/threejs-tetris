@@ -103,3 +103,56 @@ test('LayaAgent 自动检测多井局面并释放水平重力', () => {
   assert.equal(game.items.length, 0, '道具已被消耗');
   assert.match(agent.lastThought, /水平重力释放/, 'Agent 思考反馈应包含水平重力');
 });
+
+test('LayaAgent 在方块堆叠过高危急局面下（高度 >= 12）即使无深井也自动释放水平重力防暴毙', () => {
+  const game = new TetrisGame();
+  game.start();
+
+  // 构造高位平缓堆叠（高度达 13 格，距顶部仅剩 7 格，但表面平缓无深井，原逻辑会死憋不放）
+  // 比如从第 7 行堆到底部第 19 行（共 13 格高）
+  for (let r = 7; r < ROWS; r++) {
+    game.board[r][0] = { t: 'O', fx: null };
+    game.board[r][1] = { t: 'O', fx: null };
+    game.board[r][2] = { t: 'O', fx: null };
+  }
+
+  // 赋予水平重力道具
+  game.items.push({ id: 201, type: 'horizontal_gravity', name: '水平重力', dir: 'auto' });
+
+  const agent = new LayaAgent();
+  agent.target = { px: 5, rot: 0 };
+  agent.currentPieceId = 'old-piece-id';
+
+  const triggered = agent.checkAndUseHorizontalGravity(game);
+
+  assert.equal(triggered, true, '高位危急状态下，必须触发水平重力释放！');
+  assert.equal(game.items.length, 0, '道具已被使用消耗');
+  assert.equal(agent.target, null, '释放后必须清空旧 target');
+  assert.equal(agent.currentPieceId, null, '释放后必须重置 pieceId 以触发重新 plan');
+  assert.match(agent.lastThought, /防暴毙/, '思考反馈应体现紧急防暴毙');
+});
+
+test('LayaAgent 在高位且能通过水平重力降低堆叠高度时主动释放', () => {
+  const game = new TetrisGame();
+  game.start();
+
+  // 构造第 10 行到底部的阶梯（高度 10 格）
+  // 行 10 ~ 13: 只有列 3 有方块（高立柱单点支撑）
+  // 行 14 ~ 19: 列 0, 1 有方块，列 3 无支撑
+  for (let r = 10; r <= 13; r++) {
+    game.board[r][3] = { t: 'I', fx: null };
+  }
+  for (let r = 14; r < ROWS; r++) {
+    game.board[r][0] = { t: 'I', fx: null };
+    game.board[r][1] = { t: 'I', fx: null };
+  }
+
+  game.items.push({ id: 202, type: 'horizontal_gravity', name: '水平重力', dir: 'auto' });
+
+  const agent = new LayaAgent();
+  const triggered = agent.checkAndUseHorizontalGravity(game);
+
+  assert.equal(triggered, true, '高位且能大幅降低高度时，应主动释放水平重力');
+  assert.equal(game.items.length, 0);
+});
+

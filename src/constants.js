@@ -63,8 +63,45 @@ export const SHAPES = {
 
 export const TYPES = Object.keys(SHAPES);
 
-/** 4 行消行的基础得分，乘以当前等级 */
-export const LINE_SCORES = [0, 100, 300, 500, 800];
+/** 
+ * 消行基础得分表（0~20 行全覆盖）：
+ * 1 行: 100, 2 行: 300, 3 行: 500, 4 行: 800
+ * 5 行及以上（重力压实或大范围连锁消除）：每多一行 +300 分，防止出现越界 undefined 造成 NaN
+ */
+export const LINE_SCORES = [
+  0,
+  100,
+  300,
+  500,
+  800,
+  1100,
+  1400,
+  1700,
+  2000,
+  2300,
+  2600,
+  2900,
+  3200,
+  3500,
+  3800,
+  4100,
+  4400,
+  4700,
+  5000,
+  5300,
+  5600,
+];
+
+/**
+ * 安全获取消行基础得分，保证任何行数均能计算出确定性数值，绝不返回 undefined 或产生 NaN
+ * @param {number} n 消行数量
+ * @returns {number} 基础得分
+ */
+export function getLineScore(n) {
+  if (!n || n <= 0) return 0;
+  if (n < LINE_SCORES.length) return LINE_SCORES[n];
+  return 800 + (n - 4) * 300;
+}
 
 /** 初始（1级）特殊方格出现概率（原 1.0 全体出现太高，降至约 1/3） */
 export const SPECIAL_CHANCE = 0.35;

@@ -184,8 +184,17 @@ export class BoardView {
         this.particles.burst(x, y, 0xa78bfa, 5, 0.9);
         this.shake = Math.min(0.25, this.shake + 0.08);
       } else if (ev.type === 'gravity_pulse') {
-        this.shake = Math.min(0.45, this.shake + 0.28);
-        if (ev.mode === 'cols') {
+        this.shake = Math.min(0.55, this.shake + (ev.mode === 'all' ? 0.38 : 0.28));
+        if (ev.mode === 'all') {
+          // 全屏重力波粒子爆发
+          for (let c = 0; c < COLS; c += 2) {
+            for (let r = 0; r < ROWS; r += 3) {
+              const [x, y] = cellToWorld(r, c);
+              this.particles.burst(x, y, 0x22d3ee, 4, 1.4);
+              this.particles.burst(x, y, 0xfacc15, 3, 1.0);
+            }
+          }
+        } else if (ev.mode === 'cols') {
           for (const c of [ev.startIdx, ev.startIdx + 1, ev.startIdx + 2]) {
             for (let r = 0; r < ROWS; r += 2) {
               const [x, y] = cellToWorld(r, c);
@@ -200,6 +209,16 @@ export class BoardView {
               this.particles.burst(x, y, 0x22d3ee, 3, 1.2);
               this.particles.burst(x, y, 0xfacc15, 2, 0.8);
             }
+          }
+        }
+      } else if (ev.type === 'horizontal_gravity_pulse') {
+        // 水平重力：侧向冲击波震屏与青紫色粒子倾泻
+        this.shake = Math.min(0.55, this.shake + 0.35);
+        for (let r = 0; r < ROWS; r += 2) {
+          for (let c = 0; c < COLS; c += 2) {
+            const [x, y] = cellToWorld(r, c);
+            this.particles.burst(x, y, 0x38bdf8, 3, 1.3);
+            this.particles.burst(x, y, 0xc084fc, 3, 1.1);
           }
         }
       } else if (ev.type === 'item_gain') {

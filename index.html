@@ -164,6 +164,16 @@
         <div class="stat"><span class="label">SCORE</span><span class="value" id="score">0</span></div>
         <div class="stat"><span class="label">LINES</span><span class="value" id="lines">0</span></div>
         <div class="stat"><span class="label">LEVEL</span><span class="value" id="level">1</span></div>
+        <div class="stat" id="mode-stat" style="cursor: pointer;" title="点击或按 M 键切换模式"><span class="label">MODE</span><span class="value" id="game-mode" style="font-size: 18px; color: #facc15;">特技</span></div>
+        <div class="stat" id="items-stat" title="G/1: 垂直重力(⤓) | H/2: 水平重力(↔)"><span class="label">ITEMS</span><span class="value" id="game-items" style="font-size: 16px; color: #38bdf8;">0/5</span></div>
+      </div>
+      <div class="panel" id="ai-panel" style="display: flex; flex-direction: column; gap: 4px; min-width: 160px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="label">LAYA AI 托管</span>
+          <span id="ai-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #64748b; transition: background 0.2s;"></span>
+        </div>
+        <span class="value" id="ai-status" style="font-size: 15px; color: #94a3b8; font-weight: 700;">OFF (按 A 键开启)</span>
+        <span id="ai-thought" style="font-size: 10px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">—</span>
       </div>
       <div class="panel">
         <div class="label">NEXT</div>
@@ -179,7 +189,7 @@
       </div>
     </div>
 
-    <div id="controls">← → 移动　·　↑ / X 旋转　·　Z 反转　·　↓ 软降　·　空格 硬降　·　P 暂停　·　R 重开</div>
+    <div id="controls">← → 移动　·　↑ / X 旋转　·　Z 反转　·　↓ 软降　·　空格 硬降　·　G/1 垂直重力　·　H/2 水平重力　·　A 托管　·　M 模式　·　P 暂停　·　R 重开</div>
     <div id="combo"></div>
 
     <script type="module" src="/src/main.js"></script>

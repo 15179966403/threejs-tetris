@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { TetrisGame } from './TetrisGame.js';
 import { BoardView } from './BoardView.js';
 import { COLS, ROWS, SHAPES, COLORS, FX_COLORS } from './constants.js';
+import { LayaAgent } from './LayaAgent.js';
 
 /* ================= 渲染器与场景 ================= */
 
@@ -91,6 +92,69 @@ for (let i = 0; i < 16; i++) {
   nextGrid.appendChild(d);
 }
 
+/* ================= LAYA AI 代理 ================= */
+
+const layaAgent = new LayaAgent();
+const aiStatusEl = document.getElementById('ai-status');
+const aiDotEl = document.getElementById('ai-dot');
+const aiThoughtEl = document.getElementById('ai-thought');
+const aiPanelEl = document.getElementById('ai-panel');
+
+function updateAiUI(status, thought) {
+  if (!layaAgent.enabled) {
+    if (aiStatusEl) aiStatusEl.textContent = 'OFF (按 A 键开启)';
+    if (aiStatusEl) aiStatusEl.style.color = '#94a3b8';
+    if (aiDotEl) aiDotEl.style.background = '#64748b';
+    if (aiThoughtEl) aiThoughtEl.textContent = '—';
+    return;
+  }
+  if (status === 'THINKING') {
+    if (aiStatusEl) aiStatusEl.textContent = 'Laya 思考中...';
+    if (aiStatusEl) aiStatusEl.style.color = '#facc15';
+    if (aiDotEl) aiDotEl.style.background = '#facc15';
+  } else {
+    if (aiStatusEl) aiStatusEl.textContent = 'Laya 托管中 (ON)';
+    if (aiStatusEl) aiStatusEl.style.color = '#00f2fe';
+    if (aiDotEl) aiDotEl.style.background = '#00f2fe';
+  }
+  if (thought && aiThoughtEl) aiThoughtEl.textContent = thought;
+}
+
+layaAgent.onStatusChange = updateAiUI;
+if (aiPanelEl) {
+  aiPanelEl.addEventListener('click', () => {
+    layaAgent.toggle();
+    updateAiUI(layaAgent.status, layaAgent.lastThought);
+  });
+}
+
+/* ================= 模式显示与切换 ================= */
+
+const gameModeEl = document.getElementById('game-mode');
+const modeStatEl = document.getElementById('mode-stat');
+
+function updateModeUI() {
+  if (!gameModeEl) return;
+  if (game.mode === 'skill') {
+    gameModeEl.textContent = '特技';
+    gameModeEl.style.color = '#facc15';
+  } else {
+    gameModeEl.textContent = '经典';
+    gameModeEl.style.color = '#22d3ee';
+  }
+}
+
+if (modeStatEl) {
+  modeStatEl.addEventListener('click', () => {
+    const nextMode = game.mode === 'skill' ? 'classic' : 'skill';
+    game.reset({ mode: nextMode });
+    game.start();
+    refreshOverlay();
+    updateModeUI();
+  });
+}
+updateModeUI();
+
 /** 特殊格方向 -> 字形 */
 const FX_GLYPH = {
   up: '↑', ne: '↗', right: '→', se: '↘',
@@ -162,7 +226,8 @@ function refreshOverlay() {
     ovBtn.textContent = '继续游戏';
   } else {
     ovTitle.textContent = 'GAME OVER';
-    ovText.innerHTML = `本局得分 <b>${game.score}</b> · 消除 ${game.lines} 行 · 等级 ${game.level}`;
+    const displayScore = Number.isFinite(game.score) ? game.score : 0;
+    ovText.innerHTML = `本局得分 <b>${displayScore}</b> · 消除 ${game.lines} 行 · 等级 ${game.level}`;
     ovBtn.textContent = '再来一局';
   }
 }
@@ -193,6 +258,19 @@ window.addEventListener('keydown', (e) => {
     refreshOverlay();
     return;
   }
+  if (e.code === 'KeyA') {
+    layaAgent.toggle();
+    updateAiUI(layaAgent.status, layaAgent.lastThought);
+    return;
+  }
+  if (e.code === 'KeyM') {
+    const nextMode = game.mode === 'skill' ? 'classic' : 'skill';
+    game.reset({ mode: nextMode });
+    game.start();
+    refreshOverlay();
+    updateModeUI();
+    return;
+  }
   // 开始 / 重开（空格或回车）
   if ((e.code === 'Space' || e.code === 'Enter') && (s === 'ready' || s === 'gameover')) {
     e.preventDefault();
@@ -212,7 +290,13 @@ window.addEventListener('keydown', (e) => {
     case 'Space': game.hardDrop(); e.preventDefault(); break;
     case 'KeyG': case 'Digit1':
       if (game.items && game.items.length) {
-        game.useGravity('cols', 3, 'down');
+        game.useGravity('all', 0, 'down');
+      }
+      e.preventDefault();
+      break;
+    case 'KeyH': case 'Digit2':
+      if (game.items && game.items.length) {
+        game.useHorizontalGravity('auto');
       }
       e.preventDefault();
       break;
@@ -222,6 +306,7 @@ window.addEventListener('keydown', (e) => {
 /* ================= 主循环 ================= */
 
 const comboEl = document.getElementById('combo');
+const itemsEl = document.getElementById('game-items');
 let lastComboKey = null;
 
 const clock = new THREE.Clock();
@@ -231,6 +316,7 @@ function tick() {
   requestAnimationFrame(tick);
   const dt = Math.min(clock.getDelta(), 0.05); // 防止切后台后 dt 过大
   game.update(dt);
+  layaAgent.tick(game, dt);
   view.sync(game, dt);
   updateNextPreview(game.nextType, game.nextSpecial);
 
@@ -244,9 +330,21 @@ function tick() {
     camera.position.y = CAM_BASE.y;
   }
 
-  scoreEl.textContent = game.score;
+  scoreEl.textContent = Number.isFinite(game.score) ? game.score : 0;
   linesEl.textContent = game.lines;
   levelEl.textContent = game.level;
+
+  if (itemsEl) {
+    if (!game.items || game.items.length === 0) {
+      itemsEl.textContent = '0/5';
+      itemsEl.style.color = '#64748b';
+    } else {
+      const vCount = game.items.filter((it) => it.type === 'gravity').length;
+      const hCount = game.items.filter((it) => it.type === 'horizontal_gravity').length;
+      itemsEl.textContent = `⤓${vCount} ↔${hCount}`;
+      itemsEl.style.color = '#38bdf8';
+    }
+  }
 
   // 连锁波次提示
   const comboKey = game.state === 'clearing' && game.combo >= 1 ? game.combo : null;

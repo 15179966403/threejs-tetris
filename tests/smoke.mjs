@@ -582,5 +582,26 @@ const check = (name, cond) => {
   check('原活动方块可继续正常下落', moved === true && g.current.y === 6);
 }
 
+// 18. 多行同时消除（>=5 行）：得分绝不产生 NaN，始终为确定性有限数值
+{
+  const g = new TetrisGame();
+  g.start();
+
+  // 一次性构造 6 行满行（第 14~19 行全部填满）
+  for (let r = 14; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      g.board[r][c] = { t: 'T', fx: null };
+    }
+  }
+
+  // 赋予重力道具触发 6 行同时消除
+  g.items.push({ id: 888, type: 'gravity', name: '重力', dir: 'down' });
+  const ok = g.useGravity('all', 0, 'down');
+  check('6 行同时满足消行触发成功', ok === true && g.state === 'clearing');
+  check('clearingRows 包含 6 行', g.clearingRows.length === 6);
+  check('消行后分数绝非 NaN', !Number.isNaN(g.score));
+  check('消行后分数为有限正整数', Number.isFinite(g.score) && g.score > 800);
+}
+
 console.log(failures === 0 ? '\n全部通过 ✔' : `\n${failures} 项失败 ✘`);
 process.exit(failures === 0 ? 0 : 1);

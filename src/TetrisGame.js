@@ -4,6 +4,7 @@ import {
   SHAPES,
   TYPES,
   LINE_SCORES,
+  getLineScore,
   CLEAR_TIME,
   SETTLE_TIME,
   FX_TYPES,
@@ -61,6 +62,8 @@ function rotateCCW(m) {
  * 状态机：ready -> playing <-> paused -> clearing -> playing ... -> gameover
  */
 export class TetrisGame {
+  #itemCounter = 0;
+
   /**
    * @param options.specialChance 特殊格出现概率覆盖（默认取 SPECIAL_CHANCE；
    *        测试/教学模式可传 0 关闭）
@@ -79,6 +82,17 @@ export class TetrisGame {
 
   set specialChance(val) {
     this._specialChanceOverride = val;
+  }
+
+  /**
+   * 安全加分方法：确保分数为有限正整数，免疫任何 NaN / undefined 污染
+   * @param {number} amount 增量
+   */
+  #addScore(amount) {
+    if (typeof amount === 'number' && Number.isFinite(amount) && amount > 0) {
+      const current = Number.isFinite(this.score) ? this.score : 0;
+      this.score = current + Math.round(amount);
+    }
   }
 
   reset(options = {}) {
@@ -108,8 +122,9 @@ export class TetrisGame {
     this.fxEvents = []; // 视图特效事件队列（视图每帧消费后清空）
 
     // 道具系统：道具池（最多 5 个）与能量
-    this.items = []; // [{ id, type: 'gravity', name: '重力', dir: 'down' }]
+    this.items = []; // [{ id, type: 'gravity' | 'horizontal_gravity', name, dir }]
     this.itemEnergy = 0; // 当前累积的能量
+    this.#itemCounter = 0;
   }
 
   /** 当前等级获得下一个道具所需的能量需求 */
@@ -207,7 +222,8 @@ export class TetrisGame {
   /** 软降：下移一格并得 1 分 */
   softDrop() {
     if (this.move(0, 1)) {
-      this.score += 1;
+      this.dropTimer = 0;
+      this.#addScore(1);
       return true;
     }
     return false;
@@ -261,7 +277,7 @@ export class TetrisGame {
   hardDrop() {
     if (this.state !== 'playing' || !this.current) return;
     const gy = this.ghostY();
-    this.score += (gy - this.current.y) * 2;
+    this.#addScore((gy - this.current.y) * 2);
     this.current.y = gy;
     this.#lock();
   }
@@ -338,7 +354,7 @@ export class TetrisGame {
       this.clearTimer = 0;
       this.state = 'clearing';
       this.fxEvents.push({ type: 'clear', rows: full.slice() });
-      this.score += LINE_SCORES[full.length] * this.level;
+      this.#addScore(getLineScore(full.length) * (this.level || 1));
       this.lines += full.length;
       this.level = Math.floor(this.lines / 10) + 1;
     } else {
@@ -437,7 +453,7 @@ export class TetrisGame {
     //    对下移后的残余堆叠产生真实的开沟效果（可继续连锁垂直/斜向效果）
     cellsCleared += this.#runBeams(deferred, true, deferred);
 
-    if (cellsCleared) this.score += cellsCleared * LASER_CELL_SCORE * this.level;
+    if (cellsCleared) this.#addScore(cellsCleared * LASER_CELL_SCORE * (this.level || 1));
 
     const full = [];
     for (let r = 0; r < ROWS; r++) if (this.board[r].every((v) => v)) full.push(r);
@@ -448,7 +464,7 @@ export class TetrisGame {
       this.clearTimer = 0;
       this.state = 'clearing'; // 留在 clearing：下一波动画结束后再次进入本方法
       this.fxEvents.push({ type: 'clear', rows: full.slice() });
-      this.score += LINE_SCORES[full.length] * this.level * (this.combo + 1);
+      this.#addScore(getLineScore(full.length) * (this.level || 1) * (this.combo + 1));
       this.lines += full.length;
       this.level = Math.floor(this.lines / 10) + 1;
       return;
@@ -578,20 +594,32 @@ export class TetrisGame {
     }
   }
 
+  #createNextItem() {
+    const isHorizontal = this.#itemCounter++ % 2 === 1;
+    return isHorizontal
+      ? {
+          id: Date.now() + Math.random(),
+          type: 'horizontal_gravity',
+          name: '水平重力',
+          dir: 'auto',
+        }
+      : {
+          id: Date.now() + Math.random(),
+          type: 'gravity',
+          name: '重力',
+          dir: 'down',
+        };
+  }
+
   /** 触发特殊箭头方块时积攒道具能量（经典模式关闭） */
   #addEnergy(amount = 1) {
     if (!this.rules.itemsEnabled) return;
     this.itemEnergy += amount;
     while (this.itemEnergy >= this.requiredEnergy && this.items.length < MAX_ITEMS) {
       this.itemEnergy -= this.requiredEnergy;
-      const item = {
-        id: Date.now() + Math.random(),
-        type: 'gravity',
-        name: '重力',
-        dir: 'down',
-      };
+      const item = this.#createNextItem();
       this.items.push(item);
-      this.fxEvents.push({ type: 'item_gain', item: 'gravity' });
+      this.fxEvents.push({ type: 'item_gain', item: item.type });
     }
     // 道具池已满时，能量在当前需求上限处封顶，不溢出浪费
     if (this.items.length >= MAX_ITEMS) {
@@ -601,21 +629,23 @@ export class TetrisGame {
 
   /**
    * 使用重力道具（经典模式不可用）
-   * @param {'rows' | 'cols'} mode 指定连续 2 行还是连续 3 列
-   * @param {number} startIdx 起始行号 (0 <= startIdx <= ROWS - 2) 或起始列号 (0 <= startIdx <= COLS - 3)
+   * @param {'all' | 'cols' | 'rows'} [mode='all'] 作用范围：'all' 全屏所有方格压实；'cols' 连续 3 列；'rows' 连续 2 行
+   * @param {number} [startIdx=0] 起始行号或起始列号（mode='all' 时可省）
    * @param {'down' | 'up' | 'left' | 'right'} [dir='down'] 位移方向，默认向下
    * @returns {boolean} 是否成功使用
    */
-  useGravity(mode, startIdx, dir = 'down') {
+  useGravity(mode = 'all', startIdx = 0, dir = 'down') {
     if (!this.rules.itemsEnabled || this.state !== 'playing') return false;
     const itemIdx = this.items.findIndex((it) => it.type === 'gravity');
     if (itemIdx === -1) return false;
 
-    // 规范化起始坐标（列模式影响连续 3 列，行模式影响连续 2 行）
+    // 规范化起始坐标（列模式影响连续 3 列，行模式影响连续 2 行，all 为全盘）
     const safeStartIdx =
       mode === 'cols'
         ? Math.max(0, Math.min(COLS - 3, startIdx))
-        : Math.max(0, Math.min(ROWS - 2, startIdx));
+        : mode === 'rows'
+        ? Math.max(0, Math.min(ROWS - 2, startIdx))
+        : 0;
 
     // 消耗该道具
     this.items.splice(itemIdx, 1);
@@ -637,14 +667,9 @@ export class TetrisGame {
     // 消耗道具后，若原本能量封顶满溢，则立刻兑换下一个道具
     if (this.itemEnergy >= this.requiredEnergy && this.items.length < MAX_ITEMS) {
       this.itemEnergy -= this.requiredEnergy;
-      const newItem = {
-        id: Date.now() + Math.random(),
-        type: 'gravity',
-        name: '重力',
-        dir: 'down',
-      };
+      const newItem = this.#createNextItem();
       this.items.push(newItem);
-      this.fxEvents.push({ type: 'item_gain', item: 'gravity' });
+      this.fxEvents.push({ type: 'item_gain', item: newItem.type });
     }
 
     // 检查重力位移后是否补全了整行（连锁消行）
@@ -660,7 +685,7 @@ export class TetrisGame {
       this.clearTimer = 0;
       this.state = 'clearing';
       this.fxEvents.push({ type: 'clear', rows: full.slice() });
-      this.score += LINE_SCORES[full.length] * this.level;
+      this.#addScore(getLineScore(full.length) * (this.level || 1));
       this.lines += full.length;
       this.level = Math.floor(this.lines / 10) + 1;
       return true;
@@ -676,9 +701,187 @@ export class TetrisGame {
     return true;
   }
 
-  /** 执行重力物理位移：连续 2 行或连续 3 列朝指定方向下落/滑动直到受阻 */
+  /**
+   * 使用水平重力道具（经典模式不可用）
+   * @param {'auto' | 'left' | 'right'} [dir='auto'] 推移方向，默认 auto 智能选取最优侧
+   * @returns {boolean} 是否成功使用
+   */
+  useHorizontalGravity(dir = 'auto') {
+    if (!this.rules.itemsEnabled || this.state !== 'playing') return false;
+    const itemIdx = this.items.findIndex((it) => it.type === 'horizontal_gravity');
+    if (itemIdx === -1) return false;
+
+    // 自动判定最优推移侧
+    let actualDir = dir;
+    if (actualDir === 'auto') {
+      actualDir = this.#evaluateOptimalHorizontalDir();
+    }
+    if (actualDir !== 'left' && actualDir !== 'right') actualDir = 'left';
+
+    // 消耗该道具
+    this.items.splice(itemIdx, 1);
+
+    // 执行全盘水平推移及自然下坠沉降
+    this.#applyHorizontalShift(actualDir);
+
+    // 同步校准 decayQueue
+    this.#syncDecayQueue();
+
+    // 产生特效事件
+    this.fxEvents.push({
+      type: 'horizontal_gravity_pulse',
+      dir: actualDir,
+    });
+
+    // 消耗道具后，若原本能量满溢，则立刻兑换下一个道具
+    if (this.itemEnergy >= this.requiredEnergy && this.items.length < MAX_ITEMS) {
+      this.itemEnergy -= this.requiredEnergy;
+      const newItem = this.#createNextItem();
+      this.items.push(newItem);
+      this.fxEvents.push({ type: 'item_gain', item: newItem.type });
+    }
+
+    // 检查是否补全了整行（连锁消行）
+    const full = [];
+    for (let r = 0; r < ROWS; r++) {
+      if (this.board[r].every((v) => v)) full.push(r);
+    }
+
+    if (full.length) {
+      this.combo = 0;
+      this.clearingRows = full;
+      this.clearPhase = 0;
+      this.clearTimer = 0;
+      this.state = 'clearing';
+      this.fxEvents.push({ type: 'clear', rows: full.slice() });
+      this.#addScore(getLineScore(full.length) * (this.level || 1));
+      this.lines += full.length;
+      this.level = Math.floor(this.lines / 10) + 1;
+      return true;
+    }
+
+    // 若无消行连锁，确保当前活动方块与位移后棋盘无重叠碰撞（防御性防穿透）
+    if (this.current && this.#collides(this.current.matrix, this.current.x, this.current.y)) {
+      while (this.current.y > 0 && this.#collides(this.current.matrix, this.current.x, this.current.y)) {
+        this.current.y--;
+      }
+    }
+
+    return true;
+  }
+
+  /** 智能评估水平重力最优推移侧（消行更多者优先；若相同则朝重心一侧聚拢） */
+  #evaluateOptimalHorizontalDir() {
+    const evalDir = (d) => {
+      const b = this.board.map((row) => row.slice());
+      const isLeft = d === 'left';
+      for (let r = 0; r < ROWS; r++) {
+        const nonNull = b[r].filter((cell) => cell !== null);
+        if (nonNull.length === 0 || nonNull.length === COLS) continue;
+        const newRow = new Array(COLS).fill(null);
+        if (isLeft) {
+          for (let i = 0; i < nonNull.length; i++) newRow[i] = nonNull[i];
+        } else {
+          const offset = COLS - nonNull.length;
+          for (let i = 0; i < nonNull.length; i++) newRow[offset + i] = nonNull[i];
+        }
+        b[r] = newRow;
+      }
+      for (let c = 0; c < COLS; c++) {
+        for (let r = ROWS - 2; r >= 0; r--) {
+          if (b[r][c]) {
+            let ty = r;
+            while (ty + 1 < ROWS && !b[ty + 1][c]) ty++;
+            if (ty !== r) {
+              b[ty][c] = b[r][c];
+              b[r][c] = null;
+            }
+          }
+        }
+      }
+      let full = 0;
+      for (let r = 0; r < ROWS; r++) {
+        if (b[r].every((v) => v)) full++;
+      }
+      return { full };
+    };
+
+    const leftRes = evalDir('left');
+    const rightRes = evalDir('right');
+    if (leftRes.full > rightRes.full) return 'left';
+    if (rightRes.full > leftRes.full) return 'right';
+
+    let leftCount = 0;
+    let rightCount = 0;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < 5; c++) if (this.board[r][c]) leftCount++;
+      for (let c = 5; c < COLS; c++) if (this.board[r][c]) rightCount++;
+    }
+    return leftCount >= rightCount ? 'left' : 'right';
+  }
+
+  /** 执行全盘水平重力：方块向指定侧强聚拢消除井隙，紧接着自然下坠垂直压实 */
+  #applyHorizontalShift(dir = 'left') {
+    const isLeft = dir === 'left';
+
+    // 1. 每行横向推移聚拢：将行内所有散乱方块紧凑贴向一侧
+    for (let r = 0; r < ROWS; r++) {
+      const row = this.board[r];
+      const nonNull = row.filter((cell) => cell !== null);
+      if (nonNull.length === 0 || nonNull.length === COLS) continue;
+
+      const newRow = new Array(COLS).fill(null);
+      if (isLeft) {
+        for (let i = 0; i < nonNull.length; i++) {
+          newRow[i] = nonNull[i];
+        }
+      } else {
+        const offset = COLS - nonNull.length;
+        for (let i = 0; i < nonNull.length; i++) {
+          newRow[offset + i] = nonNull[i];
+        }
+      }
+      this.board[r] = newRow;
+    }
+
+    // 2. 自然垂直沉降：横移后悬空的方块自然垂直落入下方紧贴
+    for (let c = 0; c < COLS; c++) {
+      for (let r = ROWS - 2; r >= 0; r--) {
+        if (this.board[r][c]) {
+          let targetY = r;
+          while (targetY + 1 < ROWS && !this.board[targetY + 1][c]) {
+            targetY++;
+          }
+          if (targetY !== r) {
+            this.board[targetY][c] = this.board[r][c];
+            this.board[r][c] = null;
+          }
+        }
+      }
+    }
+  }
+
+  /** 执行重力物理位移：全盘所有方格、连续 2 行或连续 3 列朝指定方向下落/滑动直到受阻 */
   #applyGravityShift(mode, startIdx, dir = 'down') {
-    if (mode === 'cols') {
+    if (mode === 'all') {
+      // 作用于全屏所有 10 列已锁定方格：自下而上全体压实下坠
+      for (let c = 0; c < COLS; c++) {
+        if (dir === 'down') {
+          for (let r = ROWS - 2; r >= 0; r--) {
+            if (this.board[r][c]) {
+              let targetY = r;
+              while (targetY + 1 < ROWS && !this.board[targetY + 1][c]) {
+                targetY++;
+              }
+              if (targetY !== r) {
+                this.board[targetY][c] = this.board[r][c];
+                this.board[r][c] = null;
+              }
+            }
+          }
+        }
+      }
+    } else if (mode === 'cols') {
       const c1 = Math.max(0, Math.min(COLS - 3, startIdx));
       const colsToShift = [c1, c1 + 1, c1 + 2];
       for (const c of colsToShift) {

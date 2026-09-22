@@ -1,91 +1,106 @@
-# Laya playground
+# Laya Decision Inference Server
 
-A website, three games, a benchmark and an agent skill for [Laya](https://github.com/NandhaKishorM/laya), the open-source decision model: typed questions in, real probabilities out, one forward pass, no generated text. It runs on your own machine.
+专为 3D 俄罗斯方块智能决策 Agent (`LayaAgent.js`) 提供推理支持的轻量级后台服务。
 
-The live site is at **[brainfunctioncollapse.com/laya](https://brainfunctioncollapse.com/laya)**. It has no model behind it and replays recorded runs. Clone this repository and the same pages run against the real model.
+基于 [Laya](https://github.com/NandhaKishorM/laya) 开源决策模型（Convai Innovations 出品）：
+输入当前盘面与落点特征的自然语言状态，以单次前向传播输出置信度概率（`p(clean)`），驱动 AI 做出人类直觉般的平整铺叠决策。
 
-Laya is created by [Nandakishor M](https://github.com/NandhaKishorM) of Convai Innovations. This repository is not his and does not contain the model: it installs his package and downloads his open weights.
+---
 
-## Run it
+## 快速使用
 
+### 1. 安装依赖（首次运行）
 ```bash
-git clone https://github.com/wdobry/laya-playground
-cd laya-playground
-uv venv --python 3.12 && uv pip install laya
-.venv/bin/python server.py
+# 进入 laya-server 目录
+cd laya-server
+
+# 创建虚拟环境（推荐 Python 3.10 ~ 3.12）
+python -m venv .venv
+
+# 激活环境并安装依赖
+# Windows:
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
 
-Then open <http://127.0.0.1:8770>. The first start downloads 2.3 GB of open weights and takes about 90 seconds to load them. Apple silicon, NVIDIA or plain CPU.
+*(如果在项目根目录下，也可直接运行根目录配置的 npm 快捷指令：`npm run laya:install`)*
 
-You get the whole site, live:
-
-- `/` the landing page, where the model plays Flappy, a lane runner and Tetris itself, about 30 decisions a second
-- `/playground` the editor: write some text and a few typed questions, see every answer with its probabilities, compare all three checkpoints
-- `/about` why this exists
-
-The web server itself is the Python standard library and binds to loopback, so nothing is reachable from your network. The only dependency is `laya`.
-
-### Without the model
-
-Any static file server shows the recorded version, exactly as the public site does:
-
+### 2. 预下载模型权重（约 700MB）
 ```bash
-python3 -m http.server 8771 --bind 127.0.0.1
+python download_model.py
+```
+*(或在项目根目录下执行 `npm run laya:download`)*
+
+### 3. 启动后台推理服务
+```bash
+python server.py
+```
+*(或在项目根目录下执行 `npm run laya:server`)*
+
+服务将默认监听在 `http://127.0.0.1:8770`。
+
+---
+
+## API 接口说明
+
+### 1. 健康检查与就绪探针
+- **GET** `/api/health`
+- **响应示例**:
+```json
+{
+  "status": "ok",
+  "service": "laya-tetris-server",
+  "models": { "english": "ready" },
+  "version": "0.3.4",
+  "torch": "2.14.0+cpu",
+  "device": "cpu"
+}
 ```
 
-Then open <http://127.0.0.1:8771>. The games replay real recorded decisions and say so; the playground answers its presets from recordings.
-
-## The agent skill
-
-One file teaches a coding agent to add Laya to a project properly: the API, questions that work, thresholds, calibration, and the traps found building this site.
-
-```bash
-mkdir -p .claude/skills/laya-integration && curl -fsSL https://brainfunctioncollapse.com/laya/skills/laya-integration/SKILL.md -o .claude/skills/laya-integration/SKILL.md
+### 2. 方块落点特征评估
+- **POST** `/api/predict`
+- **请求体**:
+```json
+{
+  "state": "The piece leaves no holes, creates 1 complete row, keeps top flat at height 4.",
+  "questions": {
+    "look": {
+      "type": "choice",
+      "instructions": "Is the board surface clean, flat, and well-managed?",
+      "criteria": {
+        "clean": "The board is stable, flat, with no deep holes or messy jagged peaks.",
+        "messy": "The board is jagged, full of overhangs, steep spires, or inaccessible gaps."
+      }
+    }
+  }
+}
+```
+- **响应体**:
+```json
+{
+  "answers": {
+    "look": {
+      "choice": "clean",
+      "probabilities": {
+        "clean": 0.842,
+        "messy": 0.158
+      }
+    }
+  },
+  "latency_ms": 14.2,
+  "device": "cpu"
+}
 ```
 
-Claude Code reads `.claude/skills` natively. Any agent that accepts a markdown instruction file can use [the file](skills/laya-integration/SKILL.md) as it is.
+---
 
-## The benchmark
+## 目录结构（精简版）
 
-Laya and TypeSafe AI's hosted Jev, on the same 500 labelled examples with the same questions and no tuning. Jev is more accurate out of the box. Laya matches it on simple questions, answers several times faster from a laptop, is free, and is yours to fine-tune. The numbers on the site are rendered from [`static/data/versus.json`](static/data/versus.json), never typed by hand.
-
-To reproduce it:
-
-```bash
-.venv/bin/python eval/build_dataset.py                       # rebuilds the sampled texts from their public sources
-.venv/bin/python server.py                                   # Laya, local: leave it running in another terminal
-TYPESAFE_API_KEY=... .venv/bin/python eval/run_eval.py       # writes static/data/versus.json
 ```
-
-Two of the source datasets restrict redistribution, so the sampled texts and the raw API responses are not in this repository. `eval/provenance.json` records where every example comes from. The harness only measures: nothing from Jev is ever fed into Laya.
-
-## What is in here
-
-| Path | What it is |
-| --- | --- |
-| `server.py`, `poc.py` | the local model server and the proof of concept it grew from |
-| `index.html`, `about.html`, `playground.html` | the three pages |
-| `static/` | styles, scripts, and the recorded data the public site replays |
-| `static/demos/` | the three games: Flappy, a lane runner and Tetris. Each one describes its situation in a sentence and asks one typed question |
-| `skills/laya-integration/SKILL.md` | the agent skill |
-| `eval/` | the benchmark: dataset builder, tasks, runner |
-| `tools/` | recorders for the replays, and small site checks |
-
-Tools worth knowing:
-
-- `tools/record_run.mjs` records a real model-driven game run (`ONLY=tetris` records a single game); `tools/verify_replay.mjs` checks a recording replays identically
-- `tools/record_presets.py` records the playground's preset answers
-- `tools/build_nav.py` stamps the one shared top bar into every page; `tools/build_faq.py` regenerates the FAQ structured data from the visible Q&As
-- `tools/check_widows.mjs` fails if any text block ends on a single word, at three widths
-
-## Credits
-
-**Laya** is created by [Nandakishor M](https://github.com/NandhaKishorM) (Convai Innovations) and released under Apache-2.0: [code](https://github.com/NandhaKishorM/laya), [weights](https://huggingface.co/convaiinnovations/laya), [the original paper](https://arxiv.org/abs/2503.23303), [the follow-up](https://arxiv.org/abs/2510.01237). If Laya is useful to you, support its author.
-
-This playground, the Laya vs Jev benchmark and the agent skill are by [brain function collapse](https://brainfunctioncollapse.com).
-
-Not affiliated with or endorsed by TypeSafe AI. Jev is their product, named here only to compare.
-
-## Licence
-
-[MIT](LICENSE) for everything in this repository. Laya itself, its code and its weights, is Apache-2.0 and belongs to its author.
+laya-server/
+├── server.py             # 轻量级推理 HTTP 服务（仅包含 /api/predict 与 /api/health）
+├── download_model.py     # 决策模型权重一键预下载脚本
+├── requirements.txt      # Python 依赖清单
+├── README.md             # 本说明文档
+└── .venv/                # Python 独立虚拟环境（已被 gitignore 忽略）
+```

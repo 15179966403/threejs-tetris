@@ -9,6 +9,9 @@
     "preview": "vite preview",
     "minigame": "vite build --config vite.minigame.config.js",
     "minigame:watch": "vite build --config vite.minigame.config.js --watch",
+    "laya:install": "uv venv laya-server/.venv --python 3.12 && uv pip install -r laya-server/requirements.txt --python laya-server/.venv/Scripts/python.exe",
+    "laya:download": "laya-server/.venv/Scripts/python.exe laya-server/download_model.py",
+    "laya:server": "laya-server/.venv/Scripts/python.exe laya-server/server.py",
     "test": "node tests/smoke.mjs && node tests/settings.mjs && node tests/audio.mjs && node tests/scene.mjs && node tests/modes.mjs && node tests/compliance.mjs && node tests/laya_agent.mjs && node tests/horizontal_gravity.mjs"
   },
   "dependencies": {

@@ -9,3 +9,20 @@ minigame/game.js
 # 微信开发者工具的本地个人配置
 minigame/project.private.config.json
 error.log
+
+# Python 虚拟环境与运行时缓存（切勿提交到 git 仓库）
+.venv/
+**/__pycache__/
+*.py[cod]
+*$py.class
+laya-server/.venv/
+laya-server/.lock
+laya-server/CACHEDIR.TAG
+
+# 大模型权重与检查点文件（由部署或脚本下载至本地缓存，不入库）
+**/checkpoints/
+*.pt
+*.bin
+*.safetensors
+*.ckpt
+
